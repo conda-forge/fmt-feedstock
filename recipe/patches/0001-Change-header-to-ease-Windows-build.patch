@@ -1,7 +1,7 @@
 From 7ced344c6d5be9de1b2690a3ffe757e7d3ecf7f3 Mon Sep 17 00:00:00 2001
 From: Tom de Geus <tom@geus.me>
 Date: Fri, 15 Nov 2019 10:30:37 +0100
-Subject: [PATCH] Change header to ease Windows build
+Subject: [PATCH 1/2] Change header to ease Windows build
 
 ---
  include/fmt/format.h | 2 +-

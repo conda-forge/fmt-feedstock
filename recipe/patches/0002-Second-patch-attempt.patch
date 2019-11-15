@@ -1,0 +1,36 @@
+From d3269c48898c0bfffbd0ef159bedc939d649d1fe Mon Sep 17 00:00:00 2001
+From: Tom de Geus <tom@geus.me>
+Date: Fri, 15 Nov 2019 10:42:28 +0100
+Subject: [PATCH 2/2] Second patch attempt
+
+---
+ include/fmt/format.h | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 5a4668ea..e5f0f63b 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -36,7 +36,18 @@
+ #include <algorithm>
+ #include <cassert>
+ #include <cmath>
+-#include <stdint>
++
++#ifdef _MSC_VER
++
++typedef __int32 int32_t;
++typedef unsigned __int32 uint32_t;
++typedef __int64 int64_t;
++typedef unsigned __int64 uint64_t;
++
++#else
++#include <cstdint>
++#endif
++
+ #include <cstring>
+ #include <iterator>
+ #include <limits>
+-- 
+2.21.0 (Apple Git-122.2)
+

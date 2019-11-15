@@ -12,6 +12,7 @@ source:
   sha256: {{ sha256 }}
   patches:
     - patches/0001-Change-header-to-ease-Windows-build.patch
+    - patches/0002-Second-patch-attempt.patch
 
 build:
   number: 2
