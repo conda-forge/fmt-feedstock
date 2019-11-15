@@ -12,7 +12,7 @@ source:
   sha256: {{ sha256 }}
 
 build:
-  number: 1
+  number: 2
   skip: True  # [win and vc<14]
 
 requirements:
@@ -49,3 +49,4 @@ about:
 extra:
   recipe-maintainers:
     - tdegeus
+    - vitaut
