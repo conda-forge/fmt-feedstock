@@ -10,10 +10,11 @@ source:
   fn: {{ name }}-{{ version }}.tar.gz
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
   sha256: {{ sha256 }}
+  patches:
+    - patches/0001-Change-header-to-ease-Windows-build.patch
 
 build:
-  number: 1
-  skip: True  # [win and vc<14]
+  number: 2
 
 requirements:
   build:
