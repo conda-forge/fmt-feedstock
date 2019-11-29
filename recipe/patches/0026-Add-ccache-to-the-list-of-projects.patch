@@ -1,0 +1,25 @@
+From 58a8f2f539cda653b8ee9e038507f221fed13b4e Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 6 Sep 2019 06:26:09 -0700
+Subject: [PATCH 026/186] Add ccache to the list of projects
+
+---
+ README.rst | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/README.rst b/README.rst
+index f08b22fa..45c3b990 100644
+--- a/README.rst
++++ b/README.rst
+@@ -278,6 +278,8 @@ Projects using this library
+ 
+ * `Ceph <https://ceph.com/>`_: A scalable distributed storage system
+ 
++* `ccache <https://ccache.dev/>`_: A compiler cache
++
+ * `CUAUV <http://cuauv.org/>`_: Cornell University's autonomous underwater
+   vehicle
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

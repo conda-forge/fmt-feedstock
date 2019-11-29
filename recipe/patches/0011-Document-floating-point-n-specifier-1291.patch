@@ -1,0 +1,27 @@
+From d1dd9d53275e27dd23b6cb1e81dfbf638eb14730 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 31 Aug 2019 07:28:15 -0700
+Subject: [PATCH 011/186] Document floating-point n specifier (#1291)
+
+---
+ doc/syntax.rst | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/doc/syntax.rst b/doc/syntax.rst
+index a6bddf6b..b906c987 100644
+--- a/doc/syntax.rst
++++ b/doc/syntax.rst
+@@ -264,6 +264,10 @@ The available presentation types for floating-point values are:
+ |         | ``'E'`` if the number gets too large. The                |
+ |         | representations of infinity and NaN are uppercased, too. |
+ +---------+----------------------------------------------------------+
++| ``'n'`` | Number. This is the same as ``'g'``, except that it uses |
++|         | the current locale setting to insert the appropriate     |
++|         | number separator characters.                             |
+++---------+----------------------------------------------------------+
+ | ``'%'`` | Fixed point as a percentage. This is similar to ``'f'``, |
+ |         | but the argument is multiplied by 100 and a percent sign |
+ |         | ``%`` is appended.                                       |
+-- 
+2.21.0 (Apple Git-122.2)
+

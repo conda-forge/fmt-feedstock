@@ -1,0 +1,28 @@
+From 8877a677249608776248e4b723e78897e4a8158a Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 24 Nov 2019 08:57:39 -0800
+Subject: [PATCH 165/186] Instantiate snprintf_float
+
+---
+ src/format.cc | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/src/format.cc b/src/format.cc
+index 5ac652df..267f74ee 100644
+--- a/src/format.cc
++++ b/src/format.cc
+@@ -37,6 +37,11 @@ template FMT_API std::string internal::vformat<char>(
+ template FMT_API format_context::iterator internal::vformat_to(
+     internal::buffer<char>&, string_view, basic_format_args<format_context>);
+ 
++template FMT_API int internal::snprintf_float(double, int, internal::float_spec,
++                                              internal::buffer<char>&);
++template FMT_API int internal::snprintf_float(long double, int,
++                                              internal::float_spec,
++                                              internal::buffer<char>&);
+ template FMT_API int internal::format_float(double, int, internal::float_spec,
+                                             internal::buffer<char>&);
+ template FMT_API int internal::format_float(long double, int,
+-- 
+2.21.0 (Apple Git-122.2)
+

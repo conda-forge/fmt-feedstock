@@ -1,0 +1,57 @@
+From 422e7b9d700c6d8ee668068e4e9dc8bfb8c724af Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 31 Aug 2019 08:35:38 -0700
+Subject: [PATCH 012/186] Fix compile-time checks for user-defined types
+ (#1292)
+
+---
+ include/fmt/core.h   | 2 ++
+ include/fmt/format.h | 2 +-
+ test/format-test.cc  | 5 +++++
+ 3 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 66abfd4b..264f093a 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -207,6 +207,8 @@ template <typename T>
+ using remove_reference_t = typename std::remove_reference<T>::type;
+ template <typename T>
+ using remove_const_t = typename std::remove_const<T>::type;
++template <typename T>
++using remove_cvref_t = typename std::remove_cv<remove_reference_t<T>>::type;
+ 
+ struct monostate {};
+ 
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 08cf38dd..72a58396 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -3466,7 +3466,7 @@ template <typename Char, Char... CHARS> class udl_formatter {
+   std::basic_string<Char> operator()(Args&&... args) const {
+     FMT_CONSTEXPR_DECL Char s[] = {CHARS..., '\0'};
+     FMT_CONSTEXPR_DECL bool invalid_format =
+-        do_check_format_string<Char, error_handler, Args...>(
++        do_check_format_string<Char, error_handler, remove_cvref_t<Args>...>(
+             basic_string_view<Char>(s, sizeof...(CHARS)));
+     (void)invalid_format;
+     return format(s, std::forward<Args>(args)...);
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 9ac9f24c..419ccd22 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1894,6 +1894,11 @@ TEST(FormatTest, UdlTemplate) {
+   EXPECT_EQ("foo", "foo"_format());
+   EXPECT_EQ("        42", "{0:10}"_format(42));
+ }
++
++TEST(FormatTest, UdlPassUserDefinedObjectAsLvalue) {
++  Date date(2015, 10, 21);
++  EXPECT_EQ("2015-10-21", "{}"_format(date));
++}
+ #endif  // FMT_USE_USER_DEFINED_LITERALS
+ 
+ enum TestEnum { A };
+-- 
+2.21.0 (Apple Git-122.2)
+

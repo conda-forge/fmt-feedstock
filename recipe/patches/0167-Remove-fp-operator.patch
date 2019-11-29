@@ -1,0 +1,47 @@
+From 111fc127fecbbc5b6d8cbb50ff18e96a3f49870f Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 24 Nov 2019 13:28:15 -0800
+Subject: [PATCH 167/186] Remove fp::operator-
+
+---
+ include/fmt/format-inl.h | 6 ------
+ test/format-impl-test.cc | 6 ------
+ 2 files changed, 12 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 3d13b840..39233042 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -452,12 +452,6 @@ class fp {
+ 
+ inline bool operator==(fp x, fp y) { return x.f == y.f && x.e == y.e; }
+ 
+-// Returns an fp number representing x - y. Result may not be normalized.
+-inline fp operator-(fp x, fp y) {
+-  FMT_ASSERT(x.f >= y.f && x.e == y.e, "invalid operands");
+-  return {x.f - y.f, x.e};
+-}
+-
+ inline uint64_t multiply(uint64_t lhs, uint64_t rhs) {
+ #if FMT_USE_INT128
+   auto product = static_cast<__uint128_t>(lhs) * rhs;
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 09fe21fe..d42afe67 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -250,12 +250,6 @@ TEST(FPTest, ComputeFloatBoundaries) {
+   }
+ }
+ 
+-TEST(FPTest, Subtract) {
+-  auto v = fp(123, 1) - fp(102, 1);
+-  EXPECT_EQ(v.f, 21u);
+-  EXPECT_EQ(v.e, 1);
+-}
+-
+ TEST(FPTest, Multiply) {
+   auto v = fp(123ULL << 32, 4) * fp(56ULL << 32, 7);
+   EXPECT_EQ(v.f, 123u * 56u);
+-- 
+2.21.0 (Apple Git-122.2)
+

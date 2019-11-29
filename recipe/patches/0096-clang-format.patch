@@ -1,0 +1,26 @@
+From 8e9bffa98685da8b2e87efcf8b12bfa12e55e91f Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 23 Oct 2019 11:20:21 -0700
+Subject: [PATCH 096/186] clang-format
+
+---
+ include/fmt/format-inl.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 5a789954..d6ecc366 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -440,7 +440,8 @@ class fp {
+                                       std::numeric_limits<float>::digits - 1);
+     if (min_normal_e > e) half_ulp <<= min_normal_e - e;
+     upper = normalize<0>(fp(f + half_ulp, e));
+-    lower = fp(f - (half_ulp >> ((f == implicit_bit && e > min_normal_e) ? 1 : 0)), e);
++    lower = fp(
++        f - (half_ulp >> ((f == implicit_bit && e > min_normal_e) ? 1 : 0)), e);
+     lower.f <<= lower.e - upper.e;
+     lower.e = upper.e;
+   }
+-- 
+2.21.0 (Apple Git-122.2)
+

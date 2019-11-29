@@ -1,0 +1,25 @@
+From 63a9f3fcd4f201ee50ede5093df8b0537fbb8785 Mon Sep 17 00:00:00 2001
+From: Paul Dreik <github@pauldreik.se>
+Date: Sat, 23 Nov 2019 08:33:51 +0100
+Subject: [PATCH 161/186] fix bad oss fuzz link in the oss-fuzz badge
+
+---
+ README.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.rst b/README.rst
+index 108fd880..98212b5f 100644
+--- a/README.rst
++++ b/README.rst
+@@ -13,7 +13,7 @@
+ 
+ .. image:: https://oss-fuzz-build-logs.storage.googleapis.com/badges/libfmt.svg
+    :alt: fmt is continuously fuzzed att oss-fuzz
+-   :target: https://bugs.chromium.org/p/oss-fuzz/issues/list?colspec=ID%20Type%20Component%20Status%20Proj%20Reported%20Owner%20Summary&q=proj%3Dfmt&can=1
++   :target: https://bugs.chromium.org/p/oss-fuzz/issues/list?colspec=ID%20Type%20Component%20Status%20Proj%20Reported%20Owner%20Summary&q=proj%3Dlibfmt&can=1
+ 
+ **{fmt}** is an open-source formatting library for C++.
+ It can be used as a safe and fast alternative to (s)printf and iostreams.
+-- 
+2.21.0 (Apple Git-122.2)
+

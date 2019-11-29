@@ -1,0 +1,27 @@
+From fe642d76484143cb3ae892409620e3297f1c8df3 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 2 Sep 2019 17:14:30 -0700
+Subject: [PATCH 020/186] Clarify use of the core API in header-only mode
+ (#1296)
+
+---
+ doc/api.rst | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index dad51f33..46231aa2 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -23,7 +23,8 @@ Core API
+ ========
+ 
+ ``fmt/core.h`` defines the core API which provides argument handling facilities
+-and a lightweight subset of formatting functions.
++and a lightweight subset of formatting functions. In the header-only mode
++include ``fmt/format.h`` instead of ``fmt/core.h``.
+ 
+ The following functions use :ref:`format string syntax <syntax>`
+ similar to that of Python's `str.format
+-- 
+2.21.0 (Apple Git-122.2)
+

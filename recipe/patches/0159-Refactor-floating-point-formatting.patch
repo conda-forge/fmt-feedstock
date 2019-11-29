@@ -1,0 +1,175 @@
+From 7395472dde83c4e5bc2ab05f815cbbe5d97d0d04 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 22 Nov 2019 11:15:09 -0800
+Subject: [PATCH 159/186] Refactor floating-point formatting
+
+---
+ include/fmt/format-inl.h | 12 ++++++------
+ include/fmt/format.h     | 41 +++++++++++++++++-----------------------
+ src/format.cc            |  3 ++-
+ test/format-impl-test.cc |  2 +-
+ 4 files changed, 26 insertions(+), 32 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index e0dd0537..41ec0c26 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -1029,12 +1029,12 @@ void fallback_format(Double d, buffer<char>& buf, int& exp10) {
+   }
+ }
+ 
+-template <typename Double,
+-          enable_if_t<(sizeof(Double) == sizeof(uint64_t)), int>>
+-bool grisu_format(Double value, buffer<char>& buf, int precision,
+-                  unsigned options, int& exp) {
++template <typename Float, enable_if_t<(sizeof(Float) == sizeof(uint64_t)), int>>
++bool grisu_format(Float value, int precision, buffer<char>& buf,
++                  float_spec spec, int& exp) {
+   FMT_ASSERT(value >= 0, "value is negative");
+-  const bool fixed = (options & grisu_options::fixed) != 0;
++
++  const bool fixed = spec.format == float_format::fixed;
+   if (value <= 0) {  // <= instead of == to silence a warning.
+     if (precision <= 0 || !fixed) {
+       exp = 0;
+@@ -1071,7 +1071,7 @@ bool grisu_format(Double value, buffer<char>& buf, int precision,
+   } else {
+     fp fp_value;
+     fp lower, upper;  // w^- and w^+ in the Grisu paper.
+-    if ((options & grisu_options::binary32) != 0)
++    if (spec.binary32)
+       fp_value.assign_float_with_boundaries(value, lower, upper);
+     else
+       fp_value.assign_with_boundaries(value, lower, upper);
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index c7f8eb74..5e9e82db 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1075,6 +1075,7 @@ struct float_spec {
+   bool locale;
+   bool percent;
+   bool alt;
++  bool binary32;
+ };
+ 
+ struct gen_digits_params {
+@@ -1116,7 +1117,7 @@ template <typename Char> class float_writer {
+   gen_digits_params params_;
+   Char decimal_point_;
+ 
+-  template <typename It> It grisu_prettify(It it) const {
++  template <typename It> It prettify(It it) const {
+     // pow(10, full_exp - 1) <= v <= pow(10, full_exp).
+     int full_exp = num_digits_ + exp_;
+     if (params_.format == float_format::exp) {
+@@ -1194,7 +1195,7 @@ template <typename Char> class float_writer {
+                            ? float_format::fixed
+                            : float_format::exp;
+     }
+-    size_ = grisu_prettify(counting_iterator()).count();
++    size_ = prettify(counting_iterator()).count();
+     size_ += params_.sign ? 1 : 0;
+   }
+ 
+@@ -1203,20 +1204,16 @@ template <typename Char> class float_writer {
+ 
+   template <typename It> void operator()(It&& it) {
+     if (params_.sign) *it++ = static_cast<Char>(data::signs[params_.sign]);
+-    it = grisu_prettify(it);
++    it = prettify(it);
+   }
+ };
+ 
+-namespace grisu_options {
+-enum { fixed = 1, binary32 = 2 };
+-}
+-
+ // Formats value using the Grisu algorithm:
+ // https://www.cs.tufts.edu/~nr/cs257/archive/florian-loitsch/printf.pdf
+-template <typename Double, FMT_ENABLE_IF(sizeof(Double) == sizeof(uint64_t))>
+-FMT_API bool grisu_format(Double, buffer<char>&, int, unsigned, int&);
+-template <typename Double, FMT_ENABLE_IF(sizeof(Double) != sizeof(uint64_t))>
+-inline bool grisu_format(Double, buffer<char>&, int, unsigned, int&) {
++template <typename Float, FMT_ENABLE_IF(sizeof(Float) == sizeof(uint64_t))>
++FMT_API bool grisu_format(Float, int, buffer<char>&, float_spec, int&);
++template <typename Float, FMT_ENABLE_IF(sizeof(Float) != sizeof(uint64_t))>
++inline bool grisu_format(Float, int, buffer<char>&, float_spec, int&) {
+   return false;
+ }
+ 
+@@ -1739,17 +1736,13 @@ template <typename Range> class basic_writer {
+       return;
+     }
+     int precision = specs.precision >= 0 || !specs.type ? specs.precision : 6;
+-    int num_digits =
+-        fspec.format == float_format::exp ? precision + 1 : precision;
+-    unsigned options = 0;
+-    if (fspec.format == float_format::fixed) options |= grisu_options::fixed;
+-    if (const_check(std::is_same<T, float>()))
+-      options |= grisu_options::binary32;
++    if (fspec.format == float_format::exp) ++precision;
++    if (const_check(std::is_same<T, float>())) fspec.binary32 = true;
+     if (const_check(FMT_DEPRECATED_PERCENT) && fspec.percent) value *= 100;
+     int exp = 0;
+-    bool use_grisu = internal::use_grisu<T>() &&
+-                     grisu_format(static_cast<double>(value), buffer,
+-                                  num_digits, options, exp);
++    bool use_grisu =
++        internal::use_grisu<T>() &&
++        grisu_format(static_cast<double>(value), precision, buffer, fspec, exp);
+     if (!use_grisu) exp = sprintf_format(value, precision, fspec, buffer);
+ 
+     if (const_check(FMT_DEPRECATED_PERCENT) && fspec.percent) {
+@@ -1759,18 +1752,18 @@ template <typename Range> class basic_writer {
+     auto params = gen_digits_params();
+     params.sign = sign;
+     params.format = fspec.format;
+-    params.num_digits = num_digits;
++    params.num_digits = precision;
+     params.trailing_zeros =
+         (precision != 0 &&
+          (!specs.type || fspec.format == float_format::fixed ||
+           fspec.format == float_format::exp)) ||
+         specs.alt;
+     params.upper = fspec.upper;
+-    num_digits = static_cast<int>(buffer.size());
+     char_type point = fspec.locale ? decimal_point<char_type>(locale_)
+                                    : static_cast<char_type>('.');
+-    write_padded(specs, float_writer<char_type>(buffer.data(), num_digits, exp,
+-                                                params, point));
++    write_padded(specs, float_writer<char_type>(buffer.data(),
++                                                static_cast<int>(buffer.size()),
++                                                exp, params, point));
+   }
+ 
+   void write(char value) {
+diff --git a/src/format.cc b/src/format.cc
+index 22238257..cdd90f4e 100644
+--- a/src/format.cc
++++ b/src/format.cc
+@@ -11,7 +11,8 @@ FMT_BEGIN_NAMESPACE
+ template struct FMT_API internal::basic_data<void>;
+ 
+ // Workaround a bug in MSVC2013 that prevents instantiation of grisu_format.
+-bool (*instantiate_grisu_format)(double, internal::buffer<char>&, int, unsigned,
++bool (*instantiate_grisu_format)(double, int, internal::buffer<char>&,
++                                 internal::float_spec,
+                                  int&) = internal::grisu_format;
+ 
+ #ifndef FMT_STATIC_THOUSANDS_SEPARATOR
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 73d9ec53..1e3a0b9d 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -327,7 +327,7 @@ TEST(FPTest, FixedHandler) {
+ TEST(FPTest, GrisuFormatCompilesWithNonIEEEDouble) {
+   fmt::memory_buffer buf;
+   int exp = 0;
+-  grisu_format(4.2f, buf, -1, false, exp);
++  grisu_format(4.2f, -1, buf, fmt::internal::float_spec(), exp);
+ }
+ 
+ template <typename T> struct value_extractor {
+-- 
+2.21.0 (Apple Git-122.2)
+

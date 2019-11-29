@@ -1,0 +1,31 @@
+From df4dcf2ece1d7ebf18f47c73f744b442676c4727 Mon Sep 17 00:00:00 2001
+From: gabime <gmelman1@gmail.com>
+Date: Fri, 6 Sep 2019 17:10:45 +0300
+Subject: [PATCH 029/186] Fixed vs 2015 warning about unused variable when
+ grisu is off
+
+---
+ include/fmt/format.h | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 11da085f..a229053d 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2788,12 +2788,11 @@ void internal::basic_writer<Range>::write_double(T value,
+   memory_buffer buffer;
+   int exp = 0;
+   int precision = specs.precision >= 0 || !specs.type ? specs.precision : 6;
+-  unsigned options = handler.fixed ? internal::grisu_options::fixed : 0;
+   bool use_grisu = USE_GRISU &&
+                    (specs.type != 'a' && specs.type != 'A' &&
+                     specs.type != 'e' && specs.type != 'E') &&
+                    internal::grisu_format(static_cast<double>(value), buffer,
+-                                          precision, options, exp);
++                                          precision, handler.fixed ? internal::grisu_options::fixed : 0, exp);
+   char* decimal_point_pos = nullptr;
+   if (!use_grisu)
+     decimal_point_pos = internal::sprintf_format(value, buffer, specs);
+-- 
+2.21.0 (Apple Git-122.2)
+

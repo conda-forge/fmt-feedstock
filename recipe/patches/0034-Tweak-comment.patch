@@ -1,0 +1,27 @@
+From b2f0b6e44e5421176a3ec5c53946bf57fe28daf1 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 7 Sep 2019 08:43:35 -0700
+Subject: [PATCH 034/186] Tweak comment
+
+---
+ include/fmt/format-inl.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index f6e044b6..d5587ff2 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -451,8 +451,8 @@ FMT_FUNC fp operator*(fp x, fp y) {
+ #endif
+ }
+ 
+-// Returns cached power (of 10) c_k = c_k.f * pow(2, c_k.e) such that its
+-// (binary) exponent satisfies min_exponent <= c_k.e <= min_exponent + 28.
++// Returns a cached power of 10 `c_k = c_k.f * pow(2, c_k.e)` such that its
++// (binary) exponent satisfies `min_exponent <= c_k.e <= min_exponent + 28`.
+ FMT_FUNC fp get_cached_power(int min_exponent, int& pow10_exponent) {
+   const double one_over_log2_10 = 0.30102999566398114;  // 1 / log2(10)
+   int index = static_cast<int>(
+-- 
+2.21.0 (Apple Git-122.2)
+

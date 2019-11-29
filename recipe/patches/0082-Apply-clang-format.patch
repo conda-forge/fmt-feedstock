@@ -1,0 +1,44 @@
+From c4dc6bef24781f253eba9176a986f5f2ecd28299 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 13 Oct 2019 18:31:09 -0700
+Subject: [PATCH 082/186] Apply clang-format
+
+---
+ include/fmt/core.h | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 8a2a05c2..1eae83e5 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -832,11 +832,12 @@ template <typename Context> struct arg_mapper {
+   FMT_CONSTEXPR basic_string_view<char_type> map(const T& val) {
+     return basic_string_view<char_type>(val);
+   }
+-  template <typename T,
+-            FMT_ENABLE_IF(
+-                std::is_constructible<std_string_view<char_type>, T>::value &&
+-                !std::is_constructible<basic_string_view<char_type>, T>::value &&
+-                !is_string<T>::value)>
++  template <
++      typename T,
++      FMT_ENABLE_IF(
++          std::is_constructible<std_string_view<char_type>, T>::value &&
++          !std::is_constructible<basic_string_view<char_type>, T>::value &&
++          !is_string<T>::value)>
+   FMT_CONSTEXPR basic_string_view<char_type> map(const T& val) {
+     return std_string_view<char_type>(val);
+   }
+@@ -1208,7 +1209,8 @@ template <typename Context> class basic_format_args {
+ 
+   internal::type type(int index) const {
+     int shift = index * internal::packed_arg_bitsize;
+-    return static_cast<internal::type>((types_ >> shift) & internal::packed_arg_mask);
++    return static_cast<internal::type>((types_ >> shift) &
++                                       internal::packed_arg_mask);
+   }
+ 
+   friend class internal::arg_map<Context>;
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,62 @@
+From e6e82989041ca1bac56fdb5f7f3c00a33224943b Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Thu, 7 Nov 2019 12:44:10 -0800
+Subject: [PATCH 117/186] [clang-tidy] Add parentheses to macro arguments
+
+Found with bugprone-macro-parentheses
+
+Signed-off-by: Rosen Penev <rosenp@gmail.com>
+---
+ include/fmt/core.h       | 2 +-
+ include/fmt/format-inl.h | 6 +++---
+ include/fmt/posix.h      | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 34aac1c9..231c0e98 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -188,7 +188,7 @@
+ #endif
+ 
+ #ifndef FMT_ASSERT
+-#  define FMT_ASSERT(condition, message) assert((condition) && message)
++#  define FMT_ASSERT(condition, message) assert((condition) && (message))
+ #endif
+ 
+ // libc++ supports string_view in pre-c++17.
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 44e070cb..0904fa40 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -280,9 +280,9 @@ template <typename T>
+ const char basic_data<T>::hex_digits[] = "0123456789abcdef";
+ 
+ #define FMT_POWERS_OF_10(factor)                                             \
+-  factor * 10, factor * 100, factor * 1000, factor * 10000, factor * 100000, \
+-      factor * 1000000, factor * 10000000, factor * 100000000,               \
+-      factor * 1000000000
++  factor * 10, (factor) * 100, (factor) * 1000, (factor) * 10000, (factor) * 100000, \
++      (factor) * 1000000, (factor) * 10000000, (factor) * 100000000,               \
++      (factor) * 1000000000
+ 
+ template <typename T>
+ const uint64_t basic_data<T>::powers_of_10_64[] = {
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index 2512b7d1..5c306d30 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -54,8 +54,8 @@
+ #ifndef _WIN32
+ #  define FMT_RETRY_VAL(result, expression, error_result) \
+     do {                                                  \
+-      result = (expression);                              \
+-    } while (result == error_result && errno == EINTR)
++      (result) = (expression);                              \
++    } while ((result) == (error_result) && errno == EINTR)
+ #else
+ #  define FMT_RETRY_VAL(result, expression, error_result) result = (expression)
+ #endif
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,46 @@
+From 6868f888b2ff38c77ab22c7cdcc5e5b3569c97a6 Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Thu, 7 Nov 2019 13:02:05 -0800
+Subject: [PATCH 121/186] [clang-tidy] Add missing override
+
+Found with hicpp-use-override
+
+Signed-off-by: Rosen Penev <rosenp@gmail.com>
+---
+ include/fmt/format.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 332b8271..9c104df1 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -578,7 +578,7 @@ class basic_memory_buffer : private Allocator, public internal::buffer<T> {
+       : Allocator(alloc) {
+     this->set(store_, SIZE);
+   }
+-  ~basic_memory_buffer() { deallocate(); }
++  ~basic_memory_buffer() FMT_OVERRIDE { deallocate(); }
+ 
+  private:
+   // Move data from other to this buffer.
+@@ -658,7 +658,7 @@ class FMT_API format_error : public std::runtime_error {
+   format_error& operator=(const format_error&) = default;
+   format_error(format_error&&) = default;
+   format_error& operator=(format_error&&) = default;
+-  ~format_error() FMT_NOEXCEPT;
++  ~format_error() FMT_NOEXCEPT FMT_OVERRIDE;
+ };
+ 
+ namespace internal {
+@@ -2752,7 +2752,7 @@ class FMT_API system_error : public std::runtime_error {
+   system_error& operator=(const system_error&) = default;
+   system_error(system_error&&) = default;
+   system_error& operator=(system_error&&) = default;
+-  ~system_error() FMT_NOEXCEPT;
++  ~system_error() FMT_NOEXCEPT FMT_OVERRIDE;
+ 
+   int error_code() const { return error_code_; }
+ };
+-- 
+2.21.0 (Apple Git-122.2)
+

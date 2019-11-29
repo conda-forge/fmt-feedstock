@@ -1,0 +1,416 @@
+From 6de0454b42a8d0f72d443af09eed30df86c161a4 Mon Sep 17 00:00:00 2001
+From: Deniz Evrenci <denizevrenci@gmail.com>
+Date: Thu, 29 Aug 2019 19:36:27 +0900
+Subject: [PATCH 024/186] Add support for built-in __int128 when available
+
+---
+ include/fmt/chrono.h     |  2 +-
+ include/fmt/core.h       | 24 +++++++++++++++
+ include/fmt/format-inl.h |  2 +-
+ include/fmt/format.h     | 64 ++++++++++++++++++++++++++++++++++++----
+ include/fmt/printf.h     |  2 +-
+ test/format-impl-test.cc | 11 +++++++
+ test/format-test.cc      | 63 +++++++++++++++++++++++++++++++++++++--
+ 7 files changed, 157 insertions(+), 11 deletions(-)
+
+diff --git a/include/fmt/chrono.h b/include/fmt/chrono.h
+index 9c4c8b3b..74a2f5c2 100644
+--- a/include/fmt/chrono.h
++++ b/include/fmt/chrono.h
+@@ -582,7 +582,7 @@ struct chrono_formatter {
+   void write(Rep value, int width) {
+     write_sign();
+     if (isnan(value)) return write_nan();
+-    uint32_or_64_t<int> n = to_unsigned(
++    uint32_or_64_or_128_t<int> n = to_unsigned(
+         to_nonnegative_int(value, (std::numeric_limits<int>::max)()));
+     int num_digits = internal::count_digits(n);
+     if (width > num_digits) out = std::fill_n(out, width - num_digits, '0');
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index e06f18bb..f1200681 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -645,6 +645,8 @@ enum type {
+   uint_type,
+   long_long_type,
+   ulong_long_type,
++  int128_type,
++  uint128_type,
+   bool_type,
+   char_type,
+   last_integer_type = char_type,
+@@ -671,6 +673,10 @@ FMT_TYPE_CONSTANT(int, int_type);
+ FMT_TYPE_CONSTANT(unsigned, uint_type);
+ FMT_TYPE_CONSTANT(long long, long_long_type);
+ FMT_TYPE_CONSTANT(unsigned long long, ulong_long_type);
++#if FMT_USE_INT128
++FMT_TYPE_CONSTANT(__int128_t, int128_type);
++FMT_TYPE_CONSTANT(__uint128_t, uint128_type);
++#endif
+ FMT_TYPE_CONSTANT(bool, bool_type);
+ FMT_TYPE_CONSTANT(Char, char_type);
+ FMT_TYPE_CONSTANT(double, double_type);
+@@ -710,6 +716,10 @@ template <typename Context> class value {
+     unsigned uint_value;
+     long long long_long_value;
+     unsigned long long ulong_long_value;
++#if FMT_USE_INT128
++    __int128_t int128_value;
++    __uint128_t uint128_value;
++#endif
+     bool bool_value;
+     char_type char_value;
+     double double_value;
+@@ -724,6 +734,10 @@ template <typename Context> class value {
+   FMT_CONSTEXPR value(unsigned val) : uint_value(val) {}
+   value(long long val) : long_long_value(val) {}
+   value(unsigned long long val) : ulong_long_value(val) {}
++#if FMT_USE_INT128
++  value(__int128_t val) : int128_value(val) {}
++  value(__uint128_t val) : uint128_value(val) {}
++#endif
+   value(double val) : double_value(val) {}
+   value(long double val) : long_double_value(val) {}
+   value(bool val) : bool_value(val) {}
+@@ -783,6 +797,10 @@ template <typename Context> struct arg_mapper {
+   FMT_CONSTEXPR ulong_type map(unsigned long val) { return val; }
+   FMT_CONSTEXPR long long map(long long val) { return val; }
+   FMT_CONSTEXPR unsigned long long map(unsigned long long val) { return val; }
++#if FMT_USE_INT128
++  FMT_CONSTEXPR __int128_t map(__int128_t val) { return val; }
++  FMT_CONSTEXPR __uint128_t map(__uint128_t val) { return val; }
++#endif
+   FMT_CONSTEXPR bool map(bool val) { return val; }
+ 
+   template <typename T, FMT_ENABLE_IF(is_char<T>::value)>
+@@ -943,6 +961,12 @@ FMT_CONSTEXPR auto visit_format_arg(Visitor&& vis,
+     return vis(arg.value_.long_long_value);
+   case internal::ulong_long_type:
+     return vis(arg.value_.ulong_long_value);
++#if FMT_USE_INT128
++  case internal::int128_type:
++    return vis(arg.value_.int128_value);
++  case internal::uint128_type:
++    return vis(arg.value_.uint128_value);
++#endif
+   case internal::bool_type:
+     return vis(arg.value_.bool_value);
+   case internal::char_type:
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 3fbb8060..f6e044b6 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -158,7 +158,7 @@ FMT_FUNC void format_error_code(internal::buffer<char>& out, int error_code,
+   static const char ERROR_STR[] = "error ";
+   // Subtract 2 to account for terminating null characters in SEP and ERROR_STR.
+   std::size_t error_code_size = sizeof(SEP) + sizeof(ERROR_STR) - 2;
+-  auto abs_value = static_cast<uint32_or_64_t<int>>(error_code);
++  auto abs_value = static_cast<uint32_or_64_or_128_t<int>>(error_code);
+   if (internal::is_negative(error_code)) {
+     abs_value = 0 - abs_value;
+     ++error_code_size;
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 8eeb4dee..b8309a03 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -636,11 +636,20 @@ FMT_CONSTEXPR bool is_negative(T) {
+   return false;
+ }
+ 
++#if FMT_USE_INT128
++// Smallest of uint32_t, uint64_t, unsigned __int128 that is large enough to
++// represent all values of T.
++template <typename T>
++using uint32_or_64_or_128_t = conditional_t<
++    std::numeric_limits<T>::digits <= 32, uint32_t,
++    conditional_t<std::numeric_limits<T>::digits <= 64, uint64_t, __uint128_t>>;
++#else
+ // Smallest of uint32_t and uint64_t that is large enough to represent all
+ // values of T.
+ template <typename T>
+-using uint32_or_64_t =
++using uint32_or_64_or_128_t =
+     conditional_t<std::numeric_limits<T>::digits <= 32, uint32_t, uint64_t>;
++#endif
+ 
+ // Static data is placed in this class template for the header-only config.
+ template <typename T = void> struct FMT_EXTERN_TEMPLATE_API basic_data {
+@@ -689,6 +698,23 @@ inline int count_digits(uint64_t n) {
+ }
+ #endif
+ 
++#if FMT_USE_INT128
++inline int count_digits(__uint128_t n) {
++  int count = 1;
++  for (;;) {
++    // Integer division is slow so do it for a group of four digits instead
++    // of for every digit. The idea comes from the talk by Alexandrescu
++    // "Three Optimization Tips for C++". See speed-test for a comparison.
++    if (n < 10) return count;
++    if (n < 100) return count + 1;
++    if (n < 1000) return count + 2;
++    if (n < 10000) return count + 3;
++    n /= 10000u;
++    count += 4;
++  }
++}
++#endif
++
+ // Counts the number of digits in n. BITS = log2(radix).
+ template <unsigned BITS, typename UInt> inline int count_digits(UInt n) {
+   int num_digits = 0;
+@@ -818,12 +844,22 @@ inline Char* format_decimal(Char* buffer, UInt value, int num_digits,
+   return end;
+ }
+ 
++template <typename Int> constexpr int digits10() noexcept {
++  return std::numeric_limits<Int>::digits10;
++}
++
++#if FMT_USE_INT128
++template <> constexpr int digits10<__int128_t>() noexcept { return 38; }
++
++template <> constexpr int digits10<__uint128_t>() noexcept { return 38; }
++#endif
++
+ template <typename Char, typename UInt, typename Iterator, typename F>
+ inline Iterator format_decimal(Iterator out, UInt value, int num_digits,
+                                F add_thousands_sep) {
+   FMT_ASSERT(num_digits >= 0, "invalid digit count");
+   // Buffer should be large enough to hold all digits (<= digits10 + 1).
+-  enum { max_size = std::numeric_limits<UInt>::digits10 + 1 };
++  enum { max_size = digits10<UInt>() + 1 };
+   Char buffer[max_size + max_size / 3];
+   auto end = format_decimal(buffer, value, num_digits, add_thousands_sep);
+   return internal::copy_str<Char>(buffer, end, out);
+@@ -1324,7 +1360,7 @@ template <typename Range> class basic_writer {
+ 
+   // Writes a decimal integer.
+   template <typename Int> void write_decimal(Int value) {
+-    auto abs_value = static_cast<uint32_or_64_t<Int>>(value);
++    auto abs_value = static_cast<uint32_or_64_or_128_t<Int>>(value);
+     bool is_negative = internal::is_negative(value);
+     if (is_negative) abs_value = 0 - abs_value;
+     int num_digits = internal::count_digits(abs_value);
+@@ -1336,7 +1372,7 @@ template <typename Range> class basic_writer {
+ 
+   // The handle_int_type_spec handler that writes an integer.
+   template <typename Int, typename Specs> struct int_writer {
+-    using unsigned_type = uint32_or_64_t<Int>;
++    using unsigned_type = uint32_or_64_or_128_t<Int>;
+ 
+     basic_writer<Range>& writer;
+     const Specs& specs;
+@@ -1608,10 +1644,16 @@ template <typename Range> class basic_writer {
+   void write(int value) { write_decimal(value); }
+   void write(long value) { write_decimal(value); }
+   void write(long long value) { write_decimal(value); }
++#if FMT_USE_INT128
++  void write(__int128_t value) { write_decimal(value); }
++#endif
+ 
+   void write(unsigned value) { write_decimal(value); }
+   void write(unsigned long value) { write_decimal(value); }
+   void write(unsigned long long value) { write_decimal(value); }
++#if FMT_USE_INT128
++  void write(__uint128_t value) { write_decimal(value); }
++#endif
+ 
+   // Writes a formatted integer.
+   template <typename T, typename Spec>
+@@ -1694,6 +1736,14 @@ template <typename Range> class basic_writer {
+ 
+ using writer = basic_writer<buffer_range<char>>;
+ 
++template <typename T> struct is_integral : std::is_integral<T> {};
++
++#if FMT_USE_INT128
++template <> struct is_integral<__int128_t> : std::true_type {};
++
++template <> struct is_integral<__uint128_t> : std::true_type {};
++#endif
++
+ template <typename Range, typename ErrorHandler = internal::error_handler>
+ class arg_formatter_base {
+  public:
+@@ -1756,7 +1806,7 @@ class arg_formatter_base {
+     return out();
+   }
+ 
+-  template <typename T, FMT_ENABLE_IF(std::is_integral<T>::value)>
++  template <typename T, FMT_ENABLE_IF(is_integral<T>::value)>
+   iterator operator()(T value) {
+     if (specs_)
+       writer_.write_int(value, *specs_);
+@@ -1888,7 +1938,7 @@ template <typename Context> class custom_formatter {
+ 
+ template <typename T>
+ using is_integer =
+-    bool_constant<std::is_integral<T>::value && !std::is_same<T, bool>::value &&
++    bool_constant<is_integral<T>::value && !std::is_same<T, bool>::value &&
+                   !std::is_same<T, char>::value &&
+                   !std::is_same<T, wchar_t>::value>;
+ 
+@@ -2947,6 +2997,8 @@ struct formatter<T, Char,
+     case internal::uint_type:
+     case internal::long_long_type:
+     case internal::ulong_long_type:
++    case internal::int128_type:
++    case internal::uint128_type:
+     case internal::bool_type:
+       handle_int_type_spec(specs_.type,
+                            internal::int_type_checker<decltype(eh)>(eh));
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index a0c2d14a..c67424a4 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -158,7 +158,7 @@ template <typename Char> class printf_width_handler {
+ 
+   template <typename T, FMT_ENABLE_IF(std::is_integral<T>::value)>
+   unsigned operator()(T value) {
+-    auto width = static_cast<uint32_or_64_t<T>>(value);
++    auto width = static_cast<uint32_or_64_or_128_t<T>>(value);
+     if (internal::is_negative(value)) {
+       specs_.align = align::left;
+       width = 0 - width;
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 2017283b..5a604f4c 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -149,6 +149,17 @@ template <typename T> struct value_extractor {
+   template <typename U> FMT_NORETURN T operator()(U) {
+     throw std::runtime_error(fmt::format("invalid type {}", typeid(U).name()));
+   }
++
++#ifdef __apple_build_version__
++  // Apple Clang does not define typeid for __int128_t and __uint128_t.
++  FMT_NORETURN T operator()(__int128_t) {
++    throw std::runtime_error(fmt::format("invalid type {}", "__int128_t"));
++  }
++
++  FMT_NORETURN T operator()(__uint128_t) {
++    throw std::runtime_error(fmt::format("invalid type {}", "__uint128_t"));
++  }
++#endif
+ };
+ 
+ TEST(FormatTest, ArgConverter) {
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 419ccd22..235eccab 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1333,6 +1333,14 @@ TEST(FormatterTest, FormatBin) {
+             format("{0:b}", std::numeric_limits<uint32_t>::max()));
+ }
+ 
++#if FMT_USE_INT128
++constexpr auto INT128_MAX = static_cast<__int128_t>(
++    (static_cast<__uint128_t>(1) << ((__SIZEOF_INT128__ * CHAR_BIT) - 1)) - 1);
++constexpr auto INT128_MIN = -INT128_MAX - 1;
++
++constexpr auto UINT128_MAX = ~static_cast<__uint128_t>(0);
++#endif
++
+ TEST(FormatterTest, FormatDec) {
+   EXPECT_EQ("0", format("{0}", 0));
+   EXPECT_EQ("42", format("{0}", 42));
+@@ -1341,6 +1349,23 @@ TEST(FormatterTest, FormatDec) {
+   EXPECT_EQ("-42", format("{0}", -42));
+   EXPECT_EQ("12345", format("{0}", 12345));
+   EXPECT_EQ("67890", format("{0}", 67890));
++#if FMT_USE_INT128
++  EXPECT_EQ("0", format("{0}", static_cast<__int128_t>(0)));
++  EXPECT_EQ("0", format("{0}", static_cast<__uint128_t>(0)));
++  EXPECT_EQ("9223372036854775808",
++            format("{0}", static_cast<__int128_t>(INT64_MAX) + 1));
++  EXPECT_EQ("-9223372036854775809",
++            format("{0}", static_cast<__int128_t>(INT64_MIN) - 1));
++  EXPECT_EQ("18446744073709551616",
++            format("{0}", static_cast<__int128_t>(UINT64_MAX) + 1));
++  EXPECT_EQ("170141183460469231731687303715884105727",
++            format("{0}", INT128_MAX));
++  EXPECT_EQ("-170141183460469231731687303715884105728",
++            format("{0}", INT128_MIN));
++  EXPECT_EQ("340282366920938463463374607431768211455",
++            format("{0}", UINT128_MAX));
++#endif
++
+   char buffer[BUFFER_SIZE];
+   safe_sprintf(buffer, "%d", INT_MIN);
+   EXPECT_EQ(buffer, format("{0}", INT_MIN));
+@@ -1365,6 +1390,19 @@ TEST(FormatterTest, FormatHex) {
+   EXPECT_EQ("90abcdef", format("{0:x}", 0x90abcdef));
+   EXPECT_EQ("12345678", format("{0:X}", 0x12345678));
+   EXPECT_EQ("90ABCDEF", format("{0:X}", 0x90ABCDEF));
++#if FMT_USE_INT128
++  EXPECT_EQ("0", format("{0:x}", static_cast<__int128_t>(0)));
++  EXPECT_EQ("0", format("{0:x}", static_cast<__uint128_t>(0)));
++  EXPECT_EQ("8000000000000000",
++            format("{0:x}", static_cast<__int128_t>(INT64_MAX) + 1));
++  EXPECT_EQ("-8000000000000001",
++            format("{0:x}", static_cast<__int128_t>(INT64_MIN) - 1));
++  EXPECT_EQ("10000000000000000",
++            format("{0:x}", static_cast<__int128_t>(UINT64_MAX) + 1));
++  EXPECT_EQ("7fffffffffffffffffffffffffffffff", format("{0:x}", INT128_MAX));
++  EXPECT_EQ("-80000000000000000000000000000000", format("{0:x}", INT128_MIN));
++  EXPECT_EQ("ffffffffffffffffffffffffffffffff", format("{0:x}", UINT128_MAX));
++#endif
+ 
+   char buffer[BUFFER_SIZE];
+   safe_sprintf(buffer, "-%x", 0 - static_cast<unsigned>(INT_MIN));
+@@ -1387,6 +1425,23 @@ TEST(FormatterTest, FormatOct) {
+   EXPECT_EQ("42", format("{0:o}", 042u));
+   EXPECT_EQ("-42", format("{0:o}", -042));
+   EXPECT_EQ("12345670", format("{0:o}", 012345670));
++#if FMT_USE_INT128
++  EXPECT_EQ("0", format("{0:o}", static_cast<__int128_t>(0)));
++  EXPECT_EQ("0", format("{0:o}", static_cast<__uint128_t>(0)));
++  EXPECT_EQ("1000000000000000000000",
++            format("{0:o}", static_cast<__int128_t>(INT64_MAX) + 1));
++  EXPECT_EQ("-1000000000000000000001",
++            format("{0:o}", static_cast<__int128_t>(INT64_MIN) - 1));
++  EXPECT_EQ("2000000000000000000000",
++            format("{0:o}", static_cast<__int128_t>(UINT64_MAX) + 1));
++  EXPECT_EQ("1777777777777777777777777777777777777777777",
++            format("{0:o}", INT128_MAX));
++  EXPECT_EQ("-2000000000000000000000000000000000000000000",
++            format("{0:o}", INT128_MIN));
++  EXPECT_EQ("3777777777777777777777777777777777777777777",
++            format("{0:o}", UINT128_MAX));
++#endif
++
+   char buffer[BUFFER_SIZE];
+   safe_sprintf(buffer, "-%o", 0 - static_cast<unsigned>(INT_MIN));
+   EXPECT_EQ(buffer, format("{0:o}", INT_MIN));
+@@ -1923,7 +1978,11 @@ using buffer_range = fmt::buffer_range<char>;
+ class mock_arg_formatter
+     : public fmt::internal::arg_formatter_base<buffer_range> {
+  private:
++#if FMT_USE_INT128
++  MOCK_METHOD1(call, void(__int128_t value));
++#else
+   MOCK_METHOD1(call, void(long long value));
++#endif
+ 
+  public:
+   typedef fmt::internal::arg_formatter_base<buffer_range> base;
+@@ -1936,14 +1995,14 @@ class mock_arg_formatter
+   }
+ 
+   template <typename T>
+-  typename std::enable_if<std::is_integral<T>::value, iterator>::type
++  typename std::enable_if<fmt::internal::is_integral<T>::value, iterator>::type
+   operator()(T value) {
+     call(value);
+     return base::operator()(value);
+   }
+ 
+   template <typename T>
+-  typename std::enable_if<!std::is_integral<T>::value, iterator>::type
++  typename std::enable_if<!fmt::internal::is_integral<T>::value, iterator>::type
+   operator()(T value) {
+     return base::operator()(value);
+   }
+-- 
+2.21.0 (Apple Git-122.2)
+

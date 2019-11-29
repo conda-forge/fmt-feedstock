@@ -1,0 +1,187 @@
+From 3b2fc033d1dce39d45e0df6e06bdb912bfcaefe4 Mon Sep 17 00:00:00 2001
+From: Richard Musil <risa2000x@gmail.com>
+Date: Thu, 19 Sep 2019 14:58:15 +0200
+Subject: [PATCH 055/186] Making CUDA test work with CMAKE_MSVC_RUNTIME_LIBRARY
+
+CMake 3.15 introduced a new way of handling MSVC CRT type definition for
+the build: CMAKE_MSVC_RUNTIME_LIBRARY variable.
+(https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html)
+
+This is supposed to be the way to go with MSVC CRT selection in new
+projects. Using this method however breaks the current CMake script for
+CUDA test. The reason is the CUDA test uses "FindCUDA" CMake module to
+detect and set up CUDA support in CMake, which is deprecated since CMake
+version 3.10, and which does not support CMAKE_MSVC_RUNTIME_LIBRARY
+selector correctly (i.e. it does not propagate the compiler option
+related to the CRT).
+
+I did not find a way to "patch" in the correct compiler options, so
+(while knowing this feature is only available from CMake 3.15 on) I
+decided to change also the way CUDA is handled and instead of using
+FindCUDA, used enable_language. Apart from having some nice additional
+side-effects, it also fixed the problem with CRT selection.
+
+However, the propagation of the compiler options (and in particular the
+options related to C++ standard selection) is still a bit flaky on
+Windows+MSVC platform, so it had to be done manually.
+
+The patch makes two things in parallel:
+
+1) Introduces MSVC_BUILD_STATIC, which, together with CMake version >=
+3.15, allows building static version of the 'fmt' lib (and all the
+tests).
+
+2) At the same time, for CMake >= 3.15 it switches handling of CUDA
+support from (old) FindCUDA to (new) enable_language, to fix the
+problems which the old method has with the new CRT selector for MSVC in
+a new CMake.
+
+Added a check for CUDA before enabling it.
+
+Using VERSION_LESS instead of VERSION_GREATER_EQUAL
+
+Since apparently VERSION_GREATER_EQUAL exists only from CMake 3.7, while
+Android is using CMake 3.6.
+
+Removed MSVC_RUNTIME_LIBRARY logic from the CMake file.
+
+The static build can be set on the command line with CMake >= 3.15
+by defining the policy and the CMAKE_MSVC_RUNTIME_LIBARY this way:
+
+cmake -G <gen> <options>
+    -DCMAKE_POLICY_DEFAULT_CMP0091=NEW
+    -DMSVC_BUILD_STATIC=ON
+    -DCMAKE_MSVC_RUNTIME_LIBRARY="MultiThreaded$<$<CONFIG:Debug>:Debug>"
+
+When MSVC_BUILD_DEBUG is set the test 'posix-mock-test' is skipped as it
+does not build with the static runtime.
+---
+ test/CMakeLists.txt           | 17 ++++++++--
+ test/cuda-test/CMakeLists.txt | 60 +++++++++++++++++++++++------------
+ 2 files changed, 54 insertions(+), 23 deletions(-)
+
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 3a8e5cee..8a15135e 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -99,6 +99,9 @@ add_fmt_test(grisu-test)
+ target_compile_definitions(grisu-test PRIVATE FMT_USE_GRISU=1)
+ add_fmt_test(gtest-extra-test)
+ add_fmt_test(format-test mock-allocator.h)
++if (MSVC)
++  target_compile_options(format-test PRIVATE /bigobj)
++endif ()
+ if (NOT (MSVC AND BUILD_SHARED_LIBS))
+   add_fmt_test(format-impl-test)
+ endif ()
+@@ -110,7 +113,7 @@ add_fmt_test(custom-formatter-test)
+ add_fmt_test(ranges-test)
+ add_fmt_test(scan-test)
+ 
+-if (HAVE_OPEN)
++if (HAVE_OPEN AND NOT MSVC_BUILD_STATIC)
+   add_fmt_executable(posix-mock-test
+     posix-mock-test.cc ../src/format.cc ${TEST_MAIN_SRC})
+   target_include_directories(
+@@ -231,7 +234,17 @@ endif ()
+ 
+ # Activate optional CUDA tests if CUDA is found. For version selection, see
+ # https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#cpp14-language-features
+-find_package(CUDA 9.0)
++if (${CMAKE_VERSION} VERSION_LESS 3.15)
++  find_package(CUDA 9.0)
++else ()
++  include(CheckLanguage)
++  check_language(CUDA)
++  if (CMAKE_CUDA_COMPILER)
++    enable_language(CUDA OPTIONAL)
++    set(CUDA_FOUND TRUE)
++  endif ()
++endif ()
++
+ if (CUDA_FOUND)
+   add_subdirectory(cuda-test)
+   add_test(NAME cuda-test COMMAND fmt-in-cuda-test)
+diff --git a/test/cuda-test/CMakeLists.txt b/test/cuda-test/CMakeLists.txt
+index 6fa00c0d..be8685b8 100644
+--- a/test/cuda-test/CMakeLists.txt
++++ b/test/cuda-test/CMakeLists.txt
+@@ -14,23 +14,50 @@
+ set(CMAKE_CUDA_STANDARD 14)
+ set(CMAKE_CUDA_STANDARD_REQUIRED 14)
+ 
+-# https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html
+-list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
+-if (MSVC)
+-  # This is the solution of pytorch:
+-  # https://github.com/pytorch/pytorch/pull/7118
+-  list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "/std:c++14")
+-  list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "/Zc:__cplusplus")
+-  # for the reason of this -Xcompiler options, see below.
+-endif ()
+-
+ # In this test, we assume that the user is going to compile CUDA source code
+ # with some libraries (fmt in this case).
+ #
+ # In addition to that, this test invokes both the C++ host compiler and NVCC
+ # by providing another (non-CUDA) C++ source code.
+-cuda_add_executable(fmt-in-cuda-test cuda-cpp14.cu cpp14.cc)
+-target_compile_features(fmt-in-cuda-test PRIVATE cxx_std_14)
++if (${CMAKE_VERSION} VERSION_LESS 3.15)
++  # https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html
++  list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
++  if (MSVC)
++    # This is the solution of pytorch:
++    # https://github.com/pytorch/pytorch/pull/7118
++    list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "/std:c++14")
++    list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "/Zc:__cplusplus")
++    # for the reason of this -Xcompiler options, see below.
++  endif ()
++  cuda_add_executable(fmt-in-cuda-test cuda-cpp14.cu cpp14.cc)
++  target_compile_features(fmt-in-cuda-test PRIVATE cxx_std_14)
++  if (MSVC)
++    # This part is for (non-CUDA) C++ code. MSVC can define incorrect
++    # `__cplusplus` macro. Fix for the issue is to use additional compiler flag. 
++    #
++    # See Also:
++    # https://devblogs.microsoft.com/cppblog/msvc-now-correctly-reports-__cplusplus/
++    # https://github.com/Microsoft/vscode-cpptools/issues/2595
++    target_compile_options(fmt-in-cuda-test PRIVATE /Zc:__cplusplus /permissive-)
++  endif ()
++else()
++  # now using a "new" way of handling CUDA
++  add_executable(fmt-in-cuda-test cuda-cpp14.cu cpp14.cc)
++  set_target_properties(fmt-in-cuda-test PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
++  target_compile_features(fmt-in-cuda-test PRIVATE cxx_std_14)
++  if (MSVC)
++    # with MSVC, 'cxx_std_14' will only propagate to the host code (MSVC), but will
++    # not set __cplusplus correctly anyway, while nvcc will ignore it.
++    # If specified for nvcc on the command line as '-std=c++14' nvcc will emit this
++    # message instead:
++    # nvcc warning : The -std=c++14 flag is not supported with the configured host
++    #                compiler. Flag will be ignored.
++    set_property(SOURCE cuda-cpp14.cu APPEND PROPERTY
++      COMPILE_OPTIONS -Xcompiler /std:c++14 -Xcompiler /Zc:__cplusplus)
++    set_property(SOURCE cpp14.cc APPEND PROPERTY
++      COMPILE_OPTIONS /std:c++14 /Zc:__cplusplus)
++  endif()
++endif()
+ 
+ get_target_property(IN_USE_CUDA_STANDARD fmt-in-cuda-test CUDA_STANDARD)
+ message(STATUS "cuda_standard:          ${IN_USE_CUDA_STANDARD}")
+@@ -44,12 +71,3 @@ message(STATUS "cuda_standard_required: ${IN_USE_CUDA_STANDARD_REQUIRED}")
+ # https://cmake.org/cmake/help/latest/module/FindCUDA.html
+ target_link_libraries(fmt-in-cuda-test fmt::fmt)
+ 
+-if (MSVC)
+-  # This part is for (non-CUDA) C++ code. MSVC can define incorrect
+-  # `__cplusplus` macro. Fix for the issue is to use additional compiler flag. 
+-  #
+-  # See Also:
+-  # https://devblogs.microsoft.com/cppblog/msvc-now-correctly-reports-__cplusplus/
+-  # https://github.com/Microsoft/vscode-cpptools/issues/2595
+-  target_compile_options(fmt-in-cuda-test PRIVATE /Zc:__cplusplus /permissive-)
+-endif ()
+-- 
+2.21.0 (Apple Git-122.2)
+

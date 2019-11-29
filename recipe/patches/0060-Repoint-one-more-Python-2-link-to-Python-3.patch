@@ -1,0 +1,26 @@
+From 05710137092bee3fe6157c6e0ee777aeee253a4c Mon Sep 17 00:00:00 2001
+From: Jack Andersen <jackoalan@gmail.com>
+Date: Mon, 30 Sep 2019 16:43:04 -1000
+Subject: [PATCH 060/186] Repoint one more Python 2 link to Python 3
+
+One more python reference, this one acknowledging the `str.format` function.
+---
+ README.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.rst b/README.rst
+index b017c3e9..32dfb71d 100644
+--- a/README.rst
++++ b/README.rst
+@@ -508,7 +508,7 @@ Some ideas used in the implementation are borrowed from `Loki
+ <http://clang.llvm.org/doxygen/classclang_1_1Diagnostic.html>`_ in
+ `Clang <http://clang.llvm.org/>`_.
+ Format string syntax and the documentation are based on Python's `str.format
+-<http://docs.python.org/2/library/stdtypes.html#str.format>`_.
++<https://docs.python.org/3/library/stdtypes.html#str.format>`_.
+ Thanks `Doug Turnbull <https://github.com/softwaredoug>`_ for his valuable
+ comments and contribution to the design of the type-safe API and
+ `Gregory Czajkowski <https://github.com/gcflymoto>`_ for implementing binary
+-- 
+2.21.0 (Apple Git-122.2)
+

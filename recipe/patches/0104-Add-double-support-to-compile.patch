@@ -1,0 +1,30 @@
+From 6bfc9af8c9cf932e5574c9bf22189b0650a08ba8 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 30 Oct 2019 20:45:29 -0700
+Subject: [PATCH 104/186] Add double support to compile
+
+---
+ include/fmt/compile.h | 7 +++++++
+ 1 file changed, 7 insertions(+)
+
+diff --git a/include/fmt/compile.h b/include/fmt/compile.h
+index 491d6574..cb327057 100644
+--- a/include/fmt/compile.h
++++ b/include/fmt/compile.h
+@@ -373,6 +373,13 @@ OutputIt format_default(OutputIt out, T value) {
+   return std::copy(fi.data(), fi.data() + fi.size(), out);
+ }
+ 
++template <typename Char, typename OutputIt>
++OutputIt format_default(OutputIt out, double value) {
++  writer w(out);
++  w.write(value);
++  return w.out();
++}
++
+ template <typename Char, typename OutputIt>
+ OutputIt format_default(OutputIt out, Char value) {
+   *out++ = value;
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,30 @@
+From 00669427df4b2677c644e386a97903e44df6a69c Mon Sep 17 00:00:00 2001
+From: kent-tri <42222765+kent-tri@users.noreply.github.com>
+Date: Mon, 21 Oct 2019 17:17:22 +0900
+Subject: [PATCH 093/186] Patch compiler error when building using nvcc
+
+If you compile using `nvcc` and pass the option `--expt-relaxed-constexpr` it will crash with an internal compiler error. This modification prevents using `constexpr` in `fmtlib` when compiling using `nvcc` and prevents the crash.
+---
+ include/fmt/core.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 993ca468..e84c02b3 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -58,10 +58,12 @@
+ // Check if relaxed C++14 constexpr is supported.
+ // GCC doesn't allow throw in constexpr until version 6 (bug 67371).
+ #ifndef FMT_USE_CONSTEXPR
++#if !defined(__NVCC__)
+ #  define FMT_USE_CONSTEXPR                                           \
+     (FMT_HAS_FEATURE(cxx_relaxed_constexpr) || FMT_MSC_VER >= 1910 || \
+      (FMT_GCC_VERSION >= 600 && __cplusplus >= 201402L))
+ #endif
++#endif
+ #if FMT_USE_CONSTEXPR
+ #  define FMT_CONSTEXPR constexpr
+ #  define FMT_CONSTEXPR_DECL constexpr
+-- 
+2.21.0 (Apple Git-122.2)
+

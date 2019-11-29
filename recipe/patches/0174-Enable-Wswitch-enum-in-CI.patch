@@ -1,0 +1,40 @@
+From 3de36e9348af51f6e822ccba33110e3370a68c73 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Tue, 26 Nov 2019 09:10:24 -0800
+Subject: [PATCH 174/186] Enable -Wswitch-enum in CI
+
+---
+ CMakeLists.txt | 2 +-
+ test/scan.h    | 3 ++-
+ 2 files changed, 3 insertions(+), 2 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index bd1e0be0..9aeb4b14 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -78,7 +78,7 @@ if (CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+       -Wcast-align -Wnon-virtual-dtor
+       -Wctor-dtor-privacy -Wdisabled-optimization
+       -Winvalid-pch -Woverloaded-virtual
+-      -Wconversion
++      -Wconversion -Wswitch-enum
+       -Wno-ctor-dtor-privacy -Wno-format-nonliteral -Wno-shadow)
+   if (NOT CMAKE_CXX_COMPILER_VERSION VERSION_LESS 4.6)
+       set(PEDANTIC_COMPILE_FLAGS ${PEDANTIC_COMPILE_FLAGS} -Wnoexcept
+diff --git a/test/scan.h b/test/scan.h
+index ace84f77..50ac0941 100644
+--- a/test/scan.h
++++ b/test/scan.h
+@@ -201,7 +201,8 @@ struct scan_handler : error_handler {
+       scan_ctx_.advance_to(it);
+       break;
+     }
+-    default:
++    case scan_type::none_type:
++    case scan_type::custom_type:
+       assert(false);
+     }
+   }
+-- 
+2.21.0 (Apple Git-122.2)
+

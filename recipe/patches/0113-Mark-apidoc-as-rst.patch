@@ -1,0 +1,32 @@
+From 0047dc10a2112be8403ab8440fc5db34d4bfeb56 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 6 Nov 2019 15:16:02 +0000
+Subject: [PATCH 113/186] Mark apidoc as rst
+
+---
+ include/fmt/core.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index fc0367fa..c481fb43 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -449,6 +449,7 @@ struct error_handler {
+ template <typename S> using char_t = typename internal::char_t_impl<S>::type;
+ 
+ /**
++  \rst
+   Parsing context consisting of a format string range being parsed and an
+   argument counter for automatic indexing.
+ 
+@@ -461,6 +462,7 @@ template <typename S> using char_t = typename internal::char_t_impl<S>::type;
+   +-----------------------+-------------------------------------+
+   | wformat_parse_context | basic_format_parse_context<wchar_t> |
+   +-----------------------+-------------------------------------+
++  \endrst
+  */
+ template <typename Char, typename ErrorHandler = internal::error_handler>
+ class basic_format_parse_context : private ErrorHandler {
+-- 
+2.21.0 (Apple Git-122.2)
+

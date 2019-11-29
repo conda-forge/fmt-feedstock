@@ -1,0 +1,314 @@
+From 2bc5585ff0f474550c6c22f18a60e72b32717472 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 18 Oct 2019 16:55:07 -0700
+Subject: [PATCH 087/186] Fix computing lower boundaries for smallest
+ normalized double
+
+---
+ include/fmt/format-inl.h | 93 ++++++++++++++++++++++------------------
+ test/format-impl-test.cc | 65 ++++++++++++++--------------
+ 2 files changed, 85 insertions(+), 73 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index cf83961c..08feab50 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -364,19 +364,8 @@ class fp {
+   static FMT_CONSTEXPR_DECL const uint64_t implicit_bit =
+       1ull << double_significand_size;
+ 
+- public:
+-  significand_type f;
+-  int e;
+-
+-  static FMT_CONSTEXPR_DECL const int significand_size =
+-      bits<significand_type>::value;
+-
+-  fp() : f(0), e(0) {}
+-  fp(uint64_t f_val, int e_val) : f(f_val), e(e_val) {}
+-
+-  // Constructs fp from an IEEE754 double. It is a template to prevent compile
+-  // errors on platforms where double is not IEEE754.
+-  template <typename Double> explicit fp(Double d) {
++  // Assigns d to this and return true iff predecessor is closer than successor.
++  template <typename Double> bool assign(Double d) {
+     // Assume double is in the format [sign][exponent][significand].
+     using limits = std::numeric_limits<Double>;
+     const int exponent_size =
+@@ -385,15 +374,33 @@ class fp {
+     const uint64_t exponent_mask = (~0ull >> 1) & ~significand_mask;
+     const int exponent_bias = (1 << exponent_size) - limits::max_exponent - 1;
+     auto u = bit_cast<uint64_t>(d);
+-    auto biased_e = (u & exponent_mask) >> double_significand_size;
+     f = u & significand_mask;
++    auto biased_e = (u & exponent_mask) >> double_significand_size;
++    // Predecessor is closer if d is a normalized power of 2 (f == 0) other than
++    // the smallest normalized number (biased_e > 1).
++    bool is_predecessor_closer = f == 0 && biased_e > 1;
+     if (biased_e != 0)
+       f += implicit_bit;
+     else
+       biased_e = 1;  // Subnormals use biased exponent 1 (min exponent).
+     e = static_cast<int>(biased_e - exponent_bias - double_significand_size);
++    return is_predecessor_closer;
+   }
+ 
++ public:
++  significand_type f;
++  int e;
++
++  static FMT_CONSTEXPR_DECL const int significand_size =
++      bits<significand_type>::value;
++
++  fp() : f(0), e(0) {}
++  fp(uint64_t f_val, int e_val) : f(f_val), e(e_val) {}
++
++  // Constructs fp from an IEEE754 double. It is a template to prevent compile
++  // errors on platforms where double is not IEEE754.
++  template <typename Double> explicit fp(Double d) { assign(d); }
++
+   // Normalizes the value converted from double and multiplied by (1 << SHIFT).
+   template <int SHIFT> friend fp normalize(fp value) {
+     // Handle subnormals.
+@@ -410,20 +417,23 @@ class fp {
+     return value;
+   }
+ 
+-  // Computes lower and upper boundaries (m^- and m^+ in the Grisu paper), where
+-  // a boundary is a value half way between the number and its predecessor
++  // Assigns d to this together with computing lower and upper boundaries,
++  // where a boundary is a value half way between the number and its predecessor
+   // (lower) or successor (upper). The upper boundary is normalized and lower
+   // has the same exponent but may be not normalized.
+-  void compute_boundaries(fp& lower, fp& upper) const {
+-    lower =
+-        f == implicit_bit ? fp((f << 2) - 1, e - 2) : fp((f << 1) - 1, e - 1);
++  template <typename Double>
++  void assign_with_boundaries(Double d, fp& lower, fp& upper) {
++    bool is_lower_closer = assign(d);
++    lower = is_lower_closer ? fp((f << 2) - 1, e - 2) : fp((f << 1) - 1, e - 1);
+     // 1 in normalize accounts for the exponent shift above.
+     upper = normalize<1>(fp((f << 1) + 1, e - 1));
+     lower.f <<= lower.e - upper.e;
+     lower.e = upper.e;
+   }
+ 
+-  void compute_float_boundaries(fp& lower, fp& upper) const {
++  template <typename Double>
++  void assign_float_with_boundaries(Double d, fp& lower, fp& upper) {
++    assign(d);
+     constexpr int min_normal_e = std::numeric_limits<float>::min_exponent -
+                                  std::numeric_limits<double>::digits;
+     significand_type half_ulp = 1 << (std::numeric_limits<double>::digits -
+@@ -436,6 +446,8 @@ class fp {
+   }
+ };
+ 
++inline bool operator==(fp x, fp y) { return x.f == y.f && x.e == y.e; }
++
+ // Returns an fp number representing x - y. Result may not be normalized.
+ inline fp operator-(fp x, fp y) {
+   FMT_ASSERT(x.f >= y.f && x.e == y.e, "invalid operands");
+@@ -948,30 +960,28 @@ template <int GRISU_VERSION> struct grisu_shortest_handler {
+ 
+ // Formats value using a variation of the Fixed-Precision Positive
+ // Floating-Point Printout ((FPP)^2) algorithm by Steele & White:
+-// http://kurtstephens.com/files/p372-steele.pdf.
+-template <typename Double>
+-FMT_FUNC void fallback_format(Double value, buffer<char>& buf, int& exp10) {
+-  fp fp_value(value);
++// https://fmt.dev/p372-steele.pdf.
++FMT_FUNC void fallback_format(fp value, buffer<char>& buf, int& exp10) {
+   // Shift to account for unequal gaps when lower boundary is 2 times closer.
+   // TODO: handle denormals
+-  int shift = 0;       // fp_value.f == 1 ? 1 : 0;
+-  bigint numerator;    // 2 * R in (FPP)^2.
+-  bigint denominator;  // 2 * S in (FPP)^2.
+-  bigint lower;        // (M^- in (FPP)^2).
+-  bigint upper_store;
++  int shift = 0;            // fp_value.f == 1 ? 1 : 0;
++  bigint numerator;         // 2 * R in (FPP)^2.
++  bigint denominator;       // 2 * S in (FPP)^2.
++  bigint lower;             // (M^- in (FPP)^2).
++  bigint upper_store;       // upper's value if different from lower.
+   bigint* upper = nullptr;  // (M^+ in (FPP)^2).
+   // Shift numerator and denominator by an extra bit to make lower and upper
+   // which are normally half ulp integers. This eliminates multiplication by 2
+   // during later computations.
+-  uint64_t significand = fp_value.f << (shift + 1);
+-  if (fp_value.e >= 0) {
++  uint64_t significand = value.f << (shift + 1);
++  if (value.e >= 0) {
+     numerator.assign(significand);
+-    numerator <<= fp_value.e;
++    numerator <<= value.e;
+     lower.assign(1);
+-    lower <<= fp_value.e;
++    lower <<= value.e;
+     if (shift != 0) {
+       upper_store.assign(1);
+-      upper_store <<= fp_value.e + shift;
++      upper_store <<= value.e + shift;
+       upper = &upper_store;
+     }
+     denominator.assign_pow10(exp10);
+@@ -986,11 +996,11 @@ FMT_FUNC void fallback_format(Double value, buffer<char>& buf, int& exp10) {
+     }
+     numerator *= significand;
+     denominator.assign(1);
+-    denominator <<= 1 - fp_value.e;
++    denominator <<= 1 - value.e;
+   } else {
+     numerator.assign(significand);
+     denominator.assign_pow10(exp10);
+-    denominator <<= 1 - fp_value.e;
++    denominator <<= 1 - value.e;
+     lower.assign(1);
+     if (shift != 0) {
+       upper_store.assign(1ull << shift);
+@@ -999,7 +1009,7 @@ FMT_FUNC void fallback_format(Double value, buffer<char>& buf, int& exp10) {
+   }
+   if (!upper) upper = &lower;
+   // Invariant: value == (numerator / denominator) * pow(10, exp10).
+-  bool even = (fp_value.f & 1) == 0;
++  bool even = (value.f & 1) == 0;
+   int num_digits = 0;
+   char* data = buf.data();
+   for (;;) {
+@@ -1045,11 +1055,11 @@ bool grisu_format(Double value, buffer<char>& buf, int precision,
+     return true;
+   }
+ 
+-  const fp fp_value(value);
+   const int min_exp = -60;  // alpha in Grisu.
+   int cached_exp10 = 0;     // K in Grisu.
+   if (precision != -1) {
+     if (precision > 17) return false;
++    fp fp_value(value);
+     fp normalized = normalize(fp_value);
+     const auto cached_pow = get_cached_power(
+         min_exp - (normalized.e + fp::significand_size), cached_exp10);
+@@ -1059,11 +1069,12 @@ bool grisu_format(Double value, buffer<char>& buf, int precision,
+       return false;
+     buf.resize(to_unsigned(handler.size));
+   } else {
++    fp fp_value;
+     fp lower, upper;  // w^- and w^+ in the Grisu paper.
+     if ((options & grisu_options::binary32) != 0)
+-      fp_value.compute_float_boundaries(lower, upper);
++      fp_value.assign_float_with_boundaries(value, lower, upper);
+     else
+-      fp_value.compute_boundaries(lower, upper);
++      fp_value.assign_with_boundaries(value, lower, upper);
+ 
+     // Find a cached power of 10 such that multiplying upper by it will bring
+     // the exponent in the range [min_exp, -32].
+@@ -1092,7 +1103,7 @@ bool grisu_format(Double value, buffer<char>& buf, int precision,
+       size = handler.size;
+       if (result == digits::error) {
+         exp = exp + size - cached_exp10 - 1;
+-        fallback_format(value, buf, exp);
++        fallback_format(fp_value, buf, exp);
+         return true;
+       }
+     }
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 852b91a1..73d9ec53 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -180,18 +180,40 @@ TEST(BigIntTest, DivModAssign) {
+   EXPECT_EQ("2a", fmt::format("{}", n2));
+ }
+ 
+-template <bool is_iec559> void test_construct_from_double() {
++template <bool is_iec559> void run_double_tests() {
+   fmt::print("warning: double is not IEC559, skipping FP tests\n");
+ }
+ 
+-template <> void test_construct_from_double<true>() {
+-  auto v = fp(1.23);
+-  EXPECT_EQ(v.f, 0x13ae147ae147aeu);
+-  EXPECT_EQ(v.e, -52);
+-}
+-
+-TEST(FPTest, ConstructFromDouble) {
+-  test_construct_from_double<std::numeric_limits<double>::is_iec559>();
++template <> void run_double_tests<true>() {
++  // Construct from double.
++  EXPECT_EQ(fp(1.23), fp(0x13ae147ae147aeu, -52));
++
++  // Compute boundaries:
++  fp value, lower, upper;
++  // Normalized & not power of 2 - equidistant boundaries:
++  value.assign_with_boundaries(1.23, lower, upper);
++  EXPECT_EQ(value, fp(0x0013ae147ae147ae, -52));
++  EXPECT_EQ(lower, fp(0x9d70a3d70a3d6c00, -63));
++  EXPECT_EQ(upper, fp(0x9d70a3d70a3d7400, -63));
++  // Normalized power of 2 - lower boundary is closer:
++  value.assign_with_boundaries(1.9807040628566084e+28, lower, upper);  // 2**94
++  EXPECT_EQ(value, fp(0x0010000000000000, 42));
++  EXPECT_EQ(lower, fp(0x7ffffffffffffe00, 31));
++  EXPECT_EQ(upper, fp(0x8000000000000400, 31));
++  // Smallest normalized double - equidistant boundaries:
++  value.assign_with_boundaries(2.2250738585072014e-308, lower, upper);
++  EXPECT_EQ(value, fp(0x0010000000000000, -1074));
++  EXPECT_EQ(lower, fp(0x7ffffffffffffc00, -1085));
++  EXPECT_EQ(upper, fp(0x8000000000000400, -1085));
++  // Subnormal - equidistant boundaries:
++  value.assign_with_boundaries(4.9406564584124654e-324, lower, upper);
++  EXPECT_EQ(value, fp(0x0000000000000001, -1074));
++  EXPECT_EQ(lower, fp(0x4000000000000000, -1137));
++  EXPECT_EQ(upper, fp(0xc000000000000000, -1137));
++}
++
++TEST(FPTest, DoubleTests) {
++  run_double_tests<std::numeric_limits<double>::is_iec559>();
+ }
+ 
+ TEST(FPTest, Normalize) {
+@@ -201,26 +223,6 @@ TEST(FPTest, Normalize) {
+   EXPECT_EQ(-6, normalized.e);
+ }
+ 
+-TEST(FPTest, ComputeBoundariesSubnormal) {
+-  auto v = fp(0xbeef, 42);
+-  fp lower, upper;
+-  v.compute_boundaries(lower, upper);
+-  EXPECT_EQ(0xbeee800000000000, lower.f);
+-  EXPECT_EQ(-6, lower.e);
+-  EXPECT_EQ(0xbeef800000000000, upper.f);
+-  EXPECT_EQ(-6, upper.e);
+-}
+-
+-TEST(FPTest, ComputeBoundaries) {
+-  auto v = fp(0x10000000000000, 42);
+-  fp lower, upper;
+-  v.compute_boundaries(lower, upper);
+-  EXPECT_EQ(0x7ffffffffffffe00, lower.f);
+-  EXPECT_EQ(31, lower.e);
+-  EXPECT_EQ(0x8000000000000400, upper.f);
+-  EXPECT_EQ(31, upper.e);
+-}
+-
+ TEST(FPTest, ComputeFloatBoundaries) {
+   struct {
+     double x, lower, upper;
+@@ -237,13 +239,12 @@ TEST(FPTest, ComputeFloatBoundaries) {
+       {1e-45f, 7.006492321624085e-46, 2.1019476964872256e-45},
+   };
+   for (auto test : tests) {
+-    auto v = fp(test.x);
+     fp vlower = normalize(fp(test.lower));
+     fp vupper = normalize(fp(test.upper));
+     vlower.f >>= vupper.e - vlower.e;
+     vlower.e = vupper.e;
+-    fp lower, upper;
+-    v.compute_float_boundaries(lower, upper);
++    fp value, lower, upper;
++    value.assign_float_with_boundaries(test.x, lower, upper);
+     EXPECT_EQ(vlower.f, lower.f);
+     EXPECT_EQ(vlower.e, lower.e);
+     EXPECT_EQ(vupper.f, upper.f);
+-- 
+2.21.0 (Apple Git-122.2)
+

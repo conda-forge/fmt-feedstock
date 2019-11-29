@@ -1,0 +1,27 @@
+From 34e921f6fe49a8caa39d9bffc3d68294f2d1e690 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 27 Nov 2019 09:26:32 -0800
+Subject: [PATCH 178/186] Update docs
+
+---
+ doc/api.rst | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index e4d4f2d0..8e88b6e1 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -97,6 +97,10 @@ string checks, output iterator and user-defined type support.
+ Compile-time Format String Checks
+ ---------------------------------
+ 
++Compile-time checks are supported for built-in and string types as well as
++user-defined types with ``constexpr`` ``parse`` functions in their ``formatter``
++specializations.
++
+ .. doxygendefine:: FMT_STRING
+ 
+ Formatting User-defined Types
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,29 @@
+From 20fdb88a1cedb1da3048dfd14637eb108d1f6808 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 23 Sep 2019 13:36:12 -0700
+Subject: [PATCH 049/186] Remove redundant and nonportable test (#1313)
+
+---
+ test/posix-test.cc | 6 ------
+ 1 file changed, 6 deletions(-)
+
+diff --git a/test/posix-test.cc b/test/posix-test.cc
+index 133a922e..9cf049b6 100644
+--- a/test/posix-test.cc
++++ b/test/posix-test.cc
+@@ -368,12 +368,6 @@ TEST(FileTest, Fdopen) {
+   EXPECT_EQ(read_fd, FMT_POSIX(fileno(read_end.fdopen("r").get())));
+ }
+ 
+-TEST(FileTest, FdopenError) {
+-  file f;
+-  EXPECT_SYSTEM_ERROR_NOASSERT(f.fdopen("r"), EBADF,
+-                               "cannot associate stream with file descriptor");
+-}
+-
+ #ifdef FMT_LOCALE
+ TEST(LocaleTest, Strtod) {
+   fmt::Locale locale;
+-- 
+2.21.0 (Apple Git-122.2)
+

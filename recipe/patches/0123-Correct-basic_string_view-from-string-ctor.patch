@@ -1,0 +1,46 @@
+From 0d6dd0cc6af15c9c77471e385f517d51014162ae Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Thu, 14 Nov 2019 05:57:23 -0800
+Subject: [PATCH 123/186] Correct basic_string_view from string ctor
+
+---
+ include/fmt/core.h | 15 ++++++++-------
+ 1 file changed, 8 insertions(+), 7 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 02a389fa..091da657 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -296,10 +296,11 @@ template <typename Char> class basic_string_view {
+       : data_(s), size_(std::char_traits<Char>::length(s)) {}
+ 
+   /** Constructs a string reference from a ``std::basic_string`` object. */
+-  template <typename Alloc>
+-  FMT_CONSTEXPR basic_string_view(const std::basic_string<Char, Alloc>& s)
+-      FMT_NOEXCEPT : data_(s.data()),
+-                     size_(s.size()) {}
++  template <typename Traits, typename Alloc>
++  FMT_CONSTEXPR basic_string_view(
++      const std::basic_string<Char, Traits, Alloc>& s) FMT_NOEXCEPT
++      : data_(s.data()),
++        size_(s.size()) {}
+ 
+   template <
+       typename S,
+@@ -389,10 +390,10 @@ inline basic_string_view<Char> to_string_view(const Char* s) {
+   return s;
+ }
+ 
+-template <typename Char, typename Traits, typename Allocator>
++template <typename Char, typename Traits, typename Alloc>
+ inline basic_string_view<Char> to_string_view(
+-    const std::basic_string<Char, Traits, Allocator>& s) {
+-  return {s.data(), s.size()};
++    const std::basic_string<Char, Traits, Alloc>& s) {
++  return s;
+ }
+ 
+ template <typename Char>
+-- 
+2.21.0 (Apple Git-122.2)
+

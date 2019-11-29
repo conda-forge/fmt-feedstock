@@ -1,0 +1,120 @@
+From 36d1390e678c29316919b64a9e3bc049798c325a Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 13 Oct 2019 19:59:09 -0700
+Subject: [PATCH 085/186] Implement round half to even
+
+---
+ include/fmt/format-inl.h | 36 +++++++++++++++++++-----------------
+ include/fmt/format.h     |  2 +-
+ test/grisu-test.cc       |  5 ++++-
+ 3 files changed, 24 insertions(+), 19 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 3fcb5ec2..cf83961c 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -946,20 +946,20 @@ template <int GRISU_VERSION> struct grisu_shortest_handler {
+   }
+ };
+ 
+-// Formats v using a variation of the Fixed-Precision Positive Floating-Point
+-// Printout ((FPP)^2) algorithm by Steele & White:
++// Formats value using a variation of the Fixed-Precision Positive
++// Floating-Point Printout ((FPP)^2) algorithm by Steele & White:
+ // http://kurtstephens.com/files/p372-steele.pdf.
+ template <typename Double>
+-FMT_FUNC void fallback_format(Double v, buffer<char>& buf, int& exp10) {
+-  fp fp_value(v);
++FMT_FUNC void fallback_format(Double value, buffer<char>& buf, int& exp10) {
++  fp fp_value(value);
+   // Shift to account for unequal gaps when lower boundary is 2 times closer.
+   // TODO: handle denormals
+-  int shift = 0; //fp_value.f == 1 ? 1 : 0;
+-  bigint numerator;          // 2 * R in (FPP)^2.
+-  bigint denominator;        // 2 * S in (FPP)^2.
+-  bigint lower;              // (M^- in (FPP)^2).
++  int shift = 0;       // fp_value.f == 1 ? 1 : 0;
++  bigint numerator;    // 2 * R in (FPP)^2.
++  bigint denominator;  // 2 * S in (FPP)^2.
++  bigint lower;        // (M^- in (FPP)^2).
+   bigint upper_store;
+-  bigint *upper = nullptr;   // (M^+ in (FPP)^2).
++  bigint* upper = nullptr;  // (M^+ in (FPP)^2).
+   // Shift numerator and denominator by an extra bit to make lower and upper
+   // which are normally half ulp integers. This eliminates multiplication by 2
+   // during later computations.
+@@ -998,27 +998,29 @@ FMT_FUNC void fallback_format(Double v, buffer<char>& buf, int& exp10) {
+     }
+   }
+   if (!upper) upper = &lower;
+-  // Invariant: fp_value == (numerator / denominator) * pow(10, exp10).
++  // Invariant: value == (numerator / denominator) * pow(10, exp10).
+   bool even = (fp_value.f & 1) == 0;
+   int num_digits = 0;
+   char* data = buf.data();
+   for (;;) {
+     int digit = numerator.divmod_assign(denominator);
+     bool low = compare(numerator, lower) - even < 0;  // numerator <[=] lower.
+-    bool high = add_compare(numerator, *upper, denominator) + even >
+-                0;  // numerator + upper >[=] pow10.
++    // numerator + upper >[=] pow10:
++    bool high = add_compare(numerator, *upper, denominator) + even > 0;
++    data[num_digits++] = static_cast<char>('0' + digit);
+     if (low || high) {
+       if (!low) {
+-        ++digit;
++        ++data[num_digits - 1];
+       } else if (high) {
+-        // TODO: round up if 2 * numerator >= denominator
++        int result = add_compare(numerator, numerator, denominator);
++        // Round half to even.
++        if (result > 0 || (result == 0 && (digit % 2) != 0))
++          ++data[num_digits - 1];
+       }
+-      data[num_digits++] = static_cast<char>('0' + digit);
+       buf.resize(num_digits);
+-      exp10 -= num_digits -1;
++      exp10 -= num_digits - 1;
+       return;
+     }
+-    data[num_digits++] = static_cast<char>('0' + digit);
+     numerator *= 10;
+     lower *= 10;
+     if (upper != &lower) *upper *= 10;
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index b9935902..1eb3d440 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1569,7 +1569,7 @@ template <typename Range> class basic_writer {
+           decimal_point_(decimal_point) {
+       int num_digits = static_cast<int>(digits.size());
+       int full_exp = num_digits + exp - 1;
+-      int precision = params.num_digits > 0 ? params.num_digits : 11;
++      int precision = params.num_digits > 0 ? params.num_digits : 16;
+       params_.fixed |= full_exp >= -4 && full_exp < precision;
+       auto it = internal::grisu_prettify<char>(
+           digits.data(), num_digits, exp, internal::counting_iterator<char>(),
+diff --git a/test/grisu-test.cc b/test/grisu-test.cc
+index b66c6b7f..02b9e6fb 100644
+--- a/test/grisu-test.cc
++++ b/test/grisu-test.cc
+@@ -48,7 +48,7 @@ TEST(GrisuTest, Prettify) {
+   EXPECT_EQ("1e-05", fmt::format("{}", 1e-5));
+   EXPECT_EQ("9.999e-05", fmt::format("{}", 9.999e-5));
+   EXPECT_EQ("10000000000.0", fmt::format("{}", 1e10));
+-  EXPECT_EQ("1e+11", fmt::format("{}", 1e11));
++  EXPECT_EQ("100000000000.0", fmt::format("{}", 1e11));
+   EXPECT_EQ("12340000000.0", fmt::format("{}", 1234e7));
+   EXPECT_EQ("12.34", fmt::format("{}", 1234e-2));
+   EXPECT_EQ("0.001234", fmt::format("{}", 1234e-6));
+@@ -66,4 +66,7 @@ TEST(GrisuTest, Fallback) {
+   EXPECT_EQ("1.372371880954233e-288",
+             fmt::format("{}", 1.372371880954233e-288));
+   EXPECT_EQ("55388492.622190244", fmt::format("{}", 55388492.622190244));
++  EXPECT_EQ("2.2506787569811123e-253",
++            fmt::format("{}", 2.2506787569811123e-253));
++  EXPECT_EQ("1103618912042992.8", fmt::format("{}", 1103618912042992.8));
+ }
+-- 
+2.21.0 (Apple Git-122.2)
+

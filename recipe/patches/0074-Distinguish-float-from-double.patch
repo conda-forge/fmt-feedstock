@@ -1,0 +1,140 @@
+From b87ac4d84063f74c89120a751d6d5b16fff54036 Mon Sep 17 00:00:00 2001
+From: Orivej Desh <orivej@gmx.fr>
+Date: Sat, 12 Oct 2019 02:47:59 +0000
+Subject: [PATCH 074/186] Distinguish float from double
+
+---
+ include/fmt/core.h       | 8 +++++++-
+ include/fmt/format-inl.h | 7 +++++++
+ include/fmt/format.h     | 8 ++++++--
+ test/core-test.cc        | 2 --
+ 4 files changed, 20 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 4bff089e..8a2a05c2 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -657,6 +657,7 @@ enum type {
+   char_type,
+   last_integer_type = char_type,
+   // followed by floating-point types.
++  float_type,
+   double_type,
+   long_double_type,
+   last_numeric_type = long_double_type,
+@@ -683,6 +684,7 @@ FMT_TYPE_CONSTANT(int128_t, int128_type);
+ FMT_TYPE_CONSTANT(uint128_t, uint128_type);
+ FMT_TYPE_CONSTANT(bool, bool_type);
+ FMT_TYPE_CONSTANT(Char, char_type);
++FMT_TYPE_CONSTANT(float, float_type);
+ FMT_TYPE_CONSTANT(double, double_type);
+ FMT_TYPE_CONSTANT(long double, long_double_type);
+ FMT_TYPE_CONSTANT(const Char*, cstring_type);
+@@ -724,6 +726,7 @@ template <typename Context> class value {
+     uint128_t uint128_value;
+     bool bool_value;
+     char_type char_value;
++    float float_value;
+     double double_value;
+     long double long_double_value;
+     const void* pointer;
+@@ -738,6 +741,7 @@ template <typename Context> class value {
+   value(unsigned long long val) : ulong_long_value(val) {}
+   value(int128_t val) : int128_value(val) {}
+   value(uint128_t val) : uint128_value(val) {}
++  value(float val) : float_value(val) {}
+   value(double val) : double_value(val) {}
+   value(long double val) : long_double_value(val) {}
+   value(bool val) : bool_value(val) {}
+@@ -809,7 +813,7 @@ template <typename Context> struct arg_mapper {
+     return val;
+   }
+ 
+-  FMT_CONSTEXPR double map(float val) { return static_cast<double>(val); }
++  FMT_CONSTEXPR float map(float val) { return val; }
+   FMT_CONSTEXPR double map(double val) { return val; }
+   FMT_CONSTEXPR long double map(long double val) { return val; }
+ 
+@@ -985,6 +989,8 @@ FMT_CONSTEXPR auto visit_format_arg(Visitor&& vis,
+     return vis(arg.value_.bool_value);
+   case internal::char_type:
+     return vis(arg.value_.char_value);
++  case internal::float_type:
++    return vis(arg.value_.float_value);
+   case internal::double_type:
+     return vis(arg.value_.double_value);
+   case internal::long_double_type:
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index a7d853a0..277acacc 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -1003,6 +1003,13 @@ FMT_API bool grisu_format(Double value, buffer<char>& buf, int precision,
+   return true;
+ }
+ 
++template <>
++char* sprintf_format<float>(float value, internal::buffer<char>& buf,
++                            sprintf_specs specs) {
++  // printf does not have a float format modifier, it only supports double.
++  return sprintf_format<double>(value, buf, specs);
++}
++
+ template <typename Double>
+ char* sprintf_format(Double value, internal::buffer<char>& buf,
+                      sprintf_specs specs) {
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 908e27e6..c8bf2e9c 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1663,6 +1663,10 @@ template <typename Range> class basic_writer {
+                                    int_writer<T, Spec>(*this, value, spec));
+   }
+ 
++  void write(float value, const format_specs& specs = format_specs()) {
++    write_double(value, specs);
++  }
++
+   void write(double value, const format_specs& specs = format_specs()) {
+     write_double(value, specs);
+   }
+@@ -1677,7 +1681,7 @@ template <typename Range> class basic_writer {
+     write_double(value, specs);
+   }
+ 
+-  // Formats a floating-point number (double or long double).
++  // Formats a floating-point number (float, double, or long double).
+   template <typename T, bool USE_GRISU = fmt::internal::use_grisu<T>()>
+   void write_double(T value, const format_specs& specs);
+ 
+@@ -3006,6 +3010,7 @@ struct formatter<T, Char,
+       handle_char_specs(
+           &specs_, internal::char_specs_checker<decltype(eh)>(specs_.type, eh));
+       break;
++    case internal::float_type:
+     case internal::double_type:
+     case internal::long_double_type:
+       handle_float_type_spec(specs_.type,
+@@ -3061,7 +3066,6 @@ FMT_FORMAT_AS(short, int);
+ FMT_FORMAT_AS(unsigned short, unsigned);
+ FMT_FORMAT_AS(long, long long);
+ FMT_FORMAT_AS(unsigned long, unsigned long long);
+-FMT_FORMAT_AS(float, double);
+ FMT_FORMAT_AS(Char*, const Char*);
+ FMT_FORMAT_AS(std::basic_string<Char>, basic_string_view<Char>);
+ FMT_FORMAT_AS(std::nullptr_t, const void*);
+diff --git a/test/core-test.cc b/test/core-test.cc
+index 931f44b7..acfd2cd0 100644
+--- a/test/core-test.cc
++++ b/test/core-test.cc
+@@ -290,8 +290,6 @@ VISIT_TYPE(long, long long);
+ VISIT_TYPE(unsigned long, unsigned long long);
+ #endif
+ 
+-VISIT_TYPE(float, double);
+-
+ #define CHECK_ARG_(Char, expected, value)                                     \
+   {                                                                           \
+     testing::StrictMock<mock_visitor<decltype(expected)>> visitor;            \
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,38 @@
+From 8e700619b7eede0dbe55668884a2050333193604 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 30 Oct 2019 07:02:38 -0700
+Subject: [PATCH 101/186] Simplify format_handler
+
+---
+ include/fmt/format.h | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 78660ab5..d97d26bf 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2663,7 +2663,7 @@ class arg_formatter : public internal::arg_formatter_base<Range> {
+   /** Formats an argument of a user-defined type. */
+   iterator operator()(typename basic_format_arg<context_type>::handle handle) {
+     handle.format(*parse_ctx_, ctx_);
+-    return this->out();
++    return ctx_.out();
+   }
+ };
+ 
+@@ -3207,10 +3207,8 @@ struct format_handler : internal::error_handler {
+ 
+   void on_replacement_field(const Char* p) {
+     advance_to(parse_context, p);
+-    internal::custom_formatter<Context> f(parse_context, context);
+-    if (!visit_format_arg(f, arg))
+-      context.advance_to(
+-          visit_format_arg(ArgFormatter(context, &parse_context), arg));
++    context.advance_to(
++        visit_format_arg(ArgFormatter(context, &parse_context), arg));
+   }
+ 
+   const Char* on_format_specs(const Char* begin, const Char* end) {
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,74 @@
+From 8ce5f680f210e192449670e049e09f30c8aef921 Mon Sep 17 00:00:00 2001
+From: Deniz Evrenci <denizevrenci@gmail.com>
+Date: Tue, 3 Sep 2019 02:25:38 +0900
+Subject: [PATCH 022/186] Rename internal::is_integral and
+ internal::is_arithmetic
+
+To reserve space for the type traits sharing the same name as the ones
+from standard library.
+---
+ include/fmt/core.h   | 8 ++++----
+ include/fmt/format.h | 6 +++---
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 6fdf0b6c..43236cc8 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -671,12 +671,12 @@ FMT_TYPE_CONSTANT(const Char*, cstring_type);
+ FMT_TYPE_CONSTANT(basic_string_view<Char>, string_type);
+ FMT_TYPE_CONSTANT(const void*, pointer_type);
+ 
+-FMT_CONSTEXPR bool is_integral(type t) {
++FMT_CONSTEXPR bool is_integral_type(type t) {
+   FMT_ASSERT(t != named_arg_type, "invalid argument type");
+   return t > none_type && t <= last_integer_type;
+ }
+ 
+-FMT_CONSTEXPR bool is_arithmetic(type t) {
++FMT_CONSTEXPR bool is_arithmetic_type(type t) {
+   FMT_ASSERT(t != named_arg_type, "invalid argument type");
+   return t > none_type && t <= last_numeric_type;
+ }
+@@ -905,8 +905,8 @@ template <typename Context> class basic_format_arg {
+ 
+   internal::type type() const { return type_; }
+ 
+-  bool is_integral() const { return internal::is_integral(type_); }
+-  bool is_arithmetic() const { return internal::is_arithmetic(type_); }
++  bool is_integral() const { return internal::is_integral_type(type_); }
++  bool is_arithmetic() const { return internal::is_arithmetic_type(type_); }
+ };
+ 
+ /**
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index b50ad004..a524c33e 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1981,20 +1981,20 @@ template <typename ErrorHandler> class numeric_specs_checker {
+       : error_handler_(eh), arg_type_(arg_type) {}
+ 
+   FMT_CONSTEXPR void require_numeric_argument() {
+-    if (!is_arithmetic(arg_type_))
++    if (!is_arithmetic_type(arg_type_))
+       error_handler_.on_error("format specifier requires numeric argument");
+   }
+ 
+   FMT_CONSTEXPR void check_sign() {
+     require_numeric_argument();
+-    if (is_integral(arg_type_) && arg_type_ != int_type &&
++    if (is_integral_type(arg_type_) && arg_type_ != int_type &&
+         arg_type_ != long_long_type && arg_type_ != internal::char_type) {
+       error_handler_.on_error("format specifier requires signed argument");
+     }
+   }
+ 
+   FMT_CONSTEXPR void check_precision() {
+-    if (is_integral(arg_type_) || arg_type_ == internal::pointer_type)
++    if (is_integral_type(arg_type_) || arg_type_ == internal::pointer_type)
+       error_handler_.on_error("precision not allowed for this argument type");
+   }
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

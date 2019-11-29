@@ -5,14 +5,200 @@
 package:
   name: {{ name|lower }}
   version: {{ version }}
+  patches:
+      - 0001-Fix-typos.patch
+      - 0002-Eliminate-shadow-variable-warning.patch
+      - 0003-Workaround-broken-deprecated-in-Intel-compiler-1273.patch
+      - 0004-Make-buffer_range-public-and-update-custom-formattin.patch
+      - 0005-Rename-precision-parameter.patch
+      - 0006-Add-a-CUDA-test.patch
+      - 0007-Map-not-int-enum-to-correct-underlying_type-1286.patch
+      - 0008-Fix-minor-clang-tidy-warnings.patch
+      - 0009-FixedEnum-StrongEnum-and-make-it-a-regression-test.patch
+      - 0010-Fix-warnings-1288.patch
+      - 0011-Document-floating-point-n-specifier-1291.patch
+      - 0012-Fix-compile-time-checks-for-user-defined-types-1292.patch
+      - 0013-Add-Werror-to-tests.patch
+      - 0014-Simplify-format-string-compilation.patch
+      - 0015-Refactor-format-string-compilation.patch
+      - 0016-Remove-string_view_metadata.patch
+      - 0017-Make-compile-work-with-user-defined-types.patch
+      - 0018-Remove-unused-code-and-refactor.patch
+      - 0019-Simplify-format-string-compilation.patch
+      - 0020-Clarify-use-of-the-core-API-in-header-only-mode-1296.patch
+      - 0021-Initial-implementation-of-optimal-compile-time-forma.patch
+      - 0022-Rename-internal-is_integral-and-internal-is_arithmet.patch
+      - 0023-Move-definition-of-FMT_USE_INT128-to-core.h.patch
+      - 0024-Add-support-for-built-in-__int128-when-available.patch
+      - 0025-Reduce-the-numer-of-ifdefs-with-an-empty-u-int128_t-.patch
+      - 0026-Add-ccache-to-the-list-of-projects.patch
+      - 0027-Format-octal-0-as-0.patch
+      - 0028-Make-numeric-alignment-optional.patch
+      - 0029-Fixed-vs-2015-warning-about-unused-variable-when-gri.patch
+      - 0030-Update-README.rst.patch
+      - 0031-Update-README.rst.patch
+      - 0032-Update-index.rst.patch
+      - 0033-Integrate-new-format-string-compilation.patch
+      - 0034-Tweak-comment.patch
+      - 0035-Add-a-bigint-stub-and-reenable-grisu.patch
+      - 0036-value-bigit.patch
+      - 0037-Refactor-normalize-and-clean-up.patch
+      - 0038-Implement-left-shift.patch
+      - 0039-Implement-multiplication-and-part-of-assignment-from.patch
+      - 0040-Add-max_value.patch
+      - 0041-Fix-format-overload-that-takes-text_style-1305.patch
+      - 0042-Fix-fallback_format-1306.patch
+      - 0043-Update-ChangeLog.rst.patch
+      - 0044-fmt.pc.in-Fix-for-cross-compilation.patch
+      - 0045-add-oss-fuzz-badge.patch
+      - 0046-Fix-shared-build-on-Solaris.patch
+      - 0047-Fix-a-warning-1319-and-simplify-code.patch
+      - 0048-Don-t-use-const-char-overload-of-operator-1309.patch
+      - 0049-Remove-redundant-and-nonportable-test-1313.patch
+      - 0050-Disable-integral-operator-1316.patch
+      - 0051-fix-get.patch
+      - 0052-fix-name-clash-in-header-only-mode.patch
+      - 0053-add-test-for-multiple-compilation-types.patch
+      - 0054-workaround-VS2019-Update-3-compiler-bug.-1328.patch
+      - 0055-Making-CUDA-test-work-with-CMAKE_MSVC_RUNTIME_LIBRAR.patch
+      - 0056-Update-README.rst.patch
+      - 0057-Provide-overload-for-fmt-join-that-handles-std-tuple.patch
+      - 0058-Fix-ambiguity-for-types-with-dodgy-conversions.patch
+      - 0059-let-README-point-to-python-3-instead-of-2.patch
+      - 0060-Repoint-one-more-Python-2-link-to-Python-3.patch
+      - 0061-Fix-handling-of-types-convertible-to-std-string_view.patch
+      - 0062-Initial-implementation-of-square.patch
+      - 0063-Implement-more-bigint-operations.patch
+      - 0064-Fix-undefined-in-core-test-and-printf-test-1345.patch
+      - 0065-Fix-undefined-in-format-test-1349.patch
+      - 0066-Implement-divmod.patch
+      - 0067-Fix-compile-error-in-printf-with-gcc9-1354.patch
+      - 0068-use-memory_buffer-to-make-color-print-behave-atomic-.patch
+      - 0069-Deduplicate-color-vformat-and-vprint.patch
+      - 0070-Add-defaulted-copy-and-move-operations-to-format_err.patch
+      - 0071-Implement-more-comparison-operators.patch
+      - 0072-Encode-types-using-5-bits.patch
+      - 0073-Use-words-for-packed-constants.patch
+      - 0074-Distinguish-float-from-double.patch
+      - 0075-Rename-write_double-to-write_fp.patch
+      - 0076-Implement-add_compare.patch
+      - 0077-Fix-a-linkage-error-introduced-by-1360-1362.patch
+      - 0078-Partially-implement-FPP-2.patch
+      - 0079-Handle-negative-exponent-and-rename-value-pow10-to-n.patch
+      - 0080-Handle-negative-exponent-and-nonnegative-power.patch
+      - 0081-Reduce-bigint-capacity.patch
+      - 0082-Apply-clang-format.patch
+      - 0083-Fix-Visual-Studio-2019-pedantic-warning-C4334-result.patch
+      - 0084-Support-single-precision-floats-in-grisu-formatting.patch
+      - 0085-Implement-round-half-to-even.patch
+      - 0086-packed_arg_bitsize-packed_arg_bits-and-remove-packed.patch
+      - 0087-Fix-computing-lower-boundaries-for-smallest-normaliz.patch
+      - 0088-Handle-assymetric-boundaries.patch
+      - 0089-Initialize-all-the-things.patch
+      - 0090-Improve-handling-of-signs.patch
+      - 0091-Simplify-grisu_writer.patch
+      - 0092-Optimize-counting.patch
+      - 0093-Patch-compiler-error-when-building-using-nvcc.patch
+      - 0094-Fix-more-Visual-Studio-2019-pedantic-warnings-1371.patch
+      - 0095-Remove-obsolete-comment-and-clang-format.patch
+      - 0096-clang-format.patch
+      - 0097-Simplify-NVCC-checks.patch
+      - 0098-Simplify-grisu_writer.patch
+      - 0099-Don-t-emit-trailing-zeros-in-exponential-notation-13.patch
+      - 0100-Make-unsigned-integer-overflow-sanitizer-happy-1377.patch
+      - 0101-Simplify-format_handler.patch
+      - 0102-Apply-get_cached_power-optimization-by-jk-jeon.patch
+      - 0103-Always-inline-grisu_gen_digits-and-disable-grisu2-by.patch
+      - 0104-Add-double-support-to-compile.patch
+      - 0105-Workaround-X11-madness-1388.patch
+      - 0106-Remove-redundant-ctor.patch
+      - 0107-Fix-UTF-8-truncation.patch
+      - 0108-basic_parse_context-basic_format_parse_context-per-s.patch
+      - 0109-Use-grouping-from-locale-for-specifier-n.patch
+      - 0110-Try-fix-CI.patch
+      - 0111-Document-members.patch
+      - 0112-Update-docs.patch
+      - 0113-Mark-apidoc-as-rst.patch
+      - 0114-clang-tidy-Turn-deleted-function-to-public.patch
+      - 0115-clang-tidy-Changes-suffixes-to-uppercase.patch
+      - 0116-clang-tidy-Use-braced-init-list.patch
+      - 0117-clang-tidy-Add-parentheses-to-macro-arguments.patch
+      - 0118-clang-tidy-Add-noexcept-where-move-is-used.patch
+      - 0119-clang-tidy-Use-auto.patch
+      - 0120-clang-tidy-Replace-with-default.patch
+      - 0121-clang-tidy-Add-missing-override.patch
+      - 0122-clang-tidy-Replace-deprecated-C-headers.patch
+      - 0123-Correct-basic_string_view-from-string-ctor.patch
+      - 0124-Remove-broken-CI-config.patch
+      - 0125-Move-has_formatter-into-the-public-fmt-namespace.-14.patch
+      - 0126-Improve-POSIX-API-detection.patch
+      - 0127-docs-Added-conda.patch
+      - 0128-Tweak-the-docs.patch
+      - 0129-Use-overridden-locale-in-ostream.patch
+      - 0130-Don-t-use-POSIX-API-on-UWP.patch
+      - 0131-Bump-version.patch
+      - 0132-Document-and-clean-basic_format_parse_context.patch
+      - 0133-Tweak-the-docs.patch
+      - 0134-Apply-coding-conventions-to-examples.patch
+      - 0135-Apply-coding-conventions-to-examples.patch
+      - 0136-Clarify-that-numeric-alignment-is-deprecated.patch
+      - 0137-Fix-indentation.patch
+      - 0138-Move-float_spec_handler-to-internal-namespace-and-up.patch
+      - 0139-Replace-bool-with-float_format-and-add-exponential.patch
+      - 0140-Refactor-float-spec-parsing.patch
+      - 0141-Make-an-opt-in-to-improve-compatibility-with-std-for.patch
+      - 0142-test-add-default-constructor-for-a-const-value.patch
+      - 0143-Remove-Grisu2.patch
+      - 0144-Deprecate-the-fmt-macro.patch
+      - 0145-Don-t-parse-unless-FMT_DEPRECATED_PERCENT-is-set.patch
+      - 0146-Use-grisu-for-exponent-notation.patch
+      - 0147-warning-C4456-declaration-of-num_digits-hides-previo.patch
+      - 0148-Remove-redundant-qualification.patch
+      - 0149-Merge-safe-duration-cast.h-into-chrono.h.patch
+      - 0150-Make-parse_arg_id-more-readable.patch
+      - 0151-Move-basic_writer-write_fp-to-where-it-belongs.patch
+      - 0152-Update-README.rst.patch
+      - 0153-Update-README.rst.patch
+      - 0154-Update-comment.patch
+      - 0155-Merge-write_fp-into-write.patch
+      - 0156-Don-t-print-for-nan-and-inf.patch
+      - 0157-Cleanup-FP-formatting.patch
+      - 0158-Refactor-floating-point-formatting.patch
+      - 0159-Refactor-floating-point-formatting.patch
+      - 0160-Integrate-Grisu-and-sprintf-digit-generators.patch
+      - 0161-fix-bad-oss-fuzz-link-in-the-oss-fuzz-badge.patch
+      - 0162-Handle-null-terminator-at-the-end-of-the-buffer.patch
+      - 0163-Don-t-print-trailing-zero-with-fixed-precision-0-and.patch
+      - 0164-Minor-cleanup.patch
+      - 0165-Instantiate-snprintf_float.patch
+      - 0166-Simplify-Grisu-implementation.patch
+      - 0167-Remove-fp-operator.patch
+      - 0168-Update-comment.patch
+      - 0169-Fix-handling-of-types-with-deleted-rvalue-conversion.patch
+      - 0170-Fix-hexfloat-buffer-reallocation.patch
+      - 0171-Fix-handling-of-streamable-and-convertible-to-string.patch
+      - 0172-Fix-precision-handling-in-snprintf_float.patch
+      - 0173-Update-README.rst.patch
+      - 0174-Enable-Wswitch-enum-in-CI.patch
+      - 0175-Remove-gen_digits_params.patch
+      - 0176-float_spec-float_specs.patch
+      - 0177-Refactor-floating-point-formatting.patch
+      - 0178-Update-docs.patch
+      - 0179-Add-missing-newline.patch
+      - 0180-Update-changelog.patch
+      - 0181-Fix-Wconversion-warnings.patch
+      - 0182-Remove-invalid-noexcept-annotation.patch
+      - 0183-Update-changelog.patch
+      - 0184-Update-docs.patch
+      - 0185-Fix-fallback-pointer-formatting-on-big-endian.patch
+      - 0186-Fixing-installation-directory-of-.dll-files-on-Windo.patch
 
 source:
-  fn: {{ name }}-{{ version }}.tar.gz
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
   sha256: {{ sha256 }}
 
 build:
-  number: 2
+  number: 3
   skip: True  # [win and vc<14]
 
 requirements:
@@ -32,7 +218,7 @@ test:
     - if exist %LIBRARY_PREFIX%\include\fmt\core.h (exit 0) else (exit 1)  # [win]
     - if exist %LIBRARY_PREFIX%\include\fmt\format.h (exit 0) else (exit 1)  # [win]
     - if exist %LIBRARY_PREFIX%\lib\cmake\fmt-config.cmake (exit 0) else (exit 1)  # [win]
-    - if exist %LIBRARY_PREFIX%\lib\lib\fmt.dll  # [win]
+    - if exist %LIBRARY_PREFIX%\lbin\fmt.dll  # [win]
 
 about:
   home: https://fmt.dev/latest/

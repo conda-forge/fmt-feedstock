@@ -1,0 +1,46 @@
+From dd11d45847fa9e4a5525242b2ffcbc8876c9ac88 Mon Sep 17 00:00:00 2001
+From: Orivej Desh <orivej@gmx.fr>
+Date: Sat, 12 Oct 2019 03:22:27 +0000
+Subject: [PATCH 072/186] Encode types using 5 bits
+
+This is needed to support more than the current 16 types.
+---
+ include/fmt/core.h | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 8cdc9cdc..60976ca5 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -889,7 +889,7 @@ using mapped_type_constant =
+                   typename Context::char_type>;
+ 
+ // Maximum number of arguments with packed types.
+-enum { max_packed_args = 15 };
++enum { max_packed_args = 12 };
+ enum : unsigned long long { is_unpacked_bit = 1ull << 63 };
+ 
+ template <typename Context> class arg_map;
+@@ -1052,7 +1052,7 @@ template <typename> constexpr unsigned long long encode_types() { return 0; }
+ template <typename Context, typename Arg, typename... Args>
+ constexpr unsigned long long encode_types() {
+   return mapped_type_constant<Arg, Context>::value |
+-         (encode_types<Context, Args...>() << 4);
++         (encode_types<Context, Args...>() << 5);
+ }
+ 
+ template <typename Context, typename T>
+@@ -1197,8 +1197,8 @@ template <typename Context> class basic_format_args {
+   bool is_packed() const { return (types_ & internal::is_unpacked_bit) == 0; }
+ 
+   internal::type type(int index) const {
+-    int shift = index * 4;
+-    return static_cast<internal::type>((types_ & (0xfull << shift)) >> shift);
++    int shift = index * 5;
++    return static_cast<internal::type>((types_ >> shift) & 0x1f);
+   }
+ 
+   friend class internal::arg_map<Context>;
+-- 
+2.21.0 (Apple Git-122.2)
+

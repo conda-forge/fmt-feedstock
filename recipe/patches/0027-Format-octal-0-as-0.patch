@@ -1,0 +1,38 @@
+From 611cf0b3c644d33b9d347b824bf06bd594bfa564 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 6 Sep 2019 07:03:47 -0700
+Subject: [PATCH 027/186] Format octal 0 as 0
+
+---
+ include/fmt/format.h | 2 +-
+ test/format-test.cc  | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index dc0f6d99..2c4cda3e 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1441,7 +1441,7 @@ template <typename Range> class basic_writer {
+ 
+     void on_oct() {
+       int num_digits = internal::count_digits<3>(abs_value);
+-      if (specs.alt && specs.precision <= num_digits) {
++      if (specs.alt && specs.precision <= num_digits && abs_value != 0) {
+         // Octal prefix '0' is counted as a digit, so only add it if precision
+         // is not greater than the number of digits.
+         prefix[prefix_size++] = '0';
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 1577137e..1637bdd2 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1001,6 +1001,7 @@ TEST(FormatterTest, HashFlag) {
+   EXPECT_EQ("0x42", format("{0:#x}", 0x42));
+   EXPECT_EQ("0X42", format("{0:#X}", 0x42));
+   EXPECT_EQ("-0x42", format("{0:#x}", -0x42));
++  EXPECT_EQ("0", format("{0:#o}", 0));
+   EXPECT_EQ("042", format("{0:#o}", 042));
+   EXPECT_EQ("-042", format("{0:#o}", -042));
+   EXPECT_EQ("42", format("{0:#}", 42u));
+-- 
+2.21.0 (Apple Git-122.2)
+

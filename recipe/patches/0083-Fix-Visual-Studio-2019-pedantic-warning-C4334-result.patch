@@ -1,0 +1,27 @@
+From 91f7619cc9cfd38ca3b73494793570ab93f69e08 Mon Sep 17 00:00:00 2001
+From: Ivan Shynkarenka <chronoxor@gmail.com>
+Date: Mon, 14 Oct 2019 15:00:03 +0300
+Subject: [PATCH 083/186] Fix Visual Studio 2019 pedantic warning C4334: '<<':
+ result of 32-bit shift implicitly converted to 64 bits (was 64-bit shift
+ intended?)
+
+---
+ include/fmt/format-inl.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index fcbcfc71..adea1f8b 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -981,7 +981,7 @@ FMT_FUNC void fallback_format(Double v, buffer<char>& buf, int& exp10) {
+     denominator <<= 1 - fp_value.e;
+     lower.assign(1);
+     if (shift != 0) {
+-      upper_store.assign(1 << shift);
++      upper_store.assign(1ull << shift);
+       upper = &upper_store;
+     }
+   }
+-- 
+2.21.0 (Apple Git-122.2)
+

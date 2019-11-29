@@ -1,0 +1,25 @@
+From f7aedc5fc4893fc627a2c0854f78a25b89214c5c Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Vedran=20Mileti=C4=87?= <vedran@miletic.net>
+Date: Thu, 19 Sep 2019 21:25:43 +0200
+Subject: [PATCH 046/186] Fix shared build on Solaris
+
+---
+ CMakeLists.txt | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 6e08aa5b..2af12e0b 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -185,7 +185,7 @@ set_target_properties(fmt PROPERTIES
+   DEBUG_POSTFIX d)
+ 
+ if (BUILD_SHARED_LIBS)
+-  if (UNIX AND NOT APPLE)
++  if (UNIX AND NOT APPLE AND NOT ${CMAKE_SYSTEM_NAME} MATCHES "SunOS")
+     # Fix rpmlint warning:
+     # unused-direct-shlib-dependency /usr/lib/libformat.so.1.1.0 /lib/libm.so.6.
+     target_link_libraries(fmt -Wl,--as-needed)
+-- 
+2.21.0 (Apple Git-122.2)
+

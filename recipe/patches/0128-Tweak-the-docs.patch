@@ -1,0 +1,28 @@
+From ceff9b0b2ed6f1c0597ce27380df65fb84ac3cfe Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 16 Nov 2019 07:14:57 -0800
+Subject: [PATCH 128/186] Tweak the docs
+
+---
+ doc/usage.rst | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/doc/usage.rst b/doc/usage.rst
+index 67f8d9cc..dacb4f03 100644
+--- a/doc/usage.rst
++++ b/doc/usage.rst
+@@ -107,7 +107,10 @@ This will generate the HTML documentation in ``doc/html``.
+ Conda
+ =====
+ 
+-fmt can be install (for Windows, macOS and Linux) on `Conda <https://docs.conda.io/en/latest/>`__, using its `conda-forge <https://conda-forge.org>`__ `package <https://github.com/conda-forge/fmt-feedstock>`__, as follows::
++fmt can be installed on Linux, macOS and Windows with
++`Conda <https://docs.conda.io/en/latest/>`__, using its
++`conda-forge <https://conda-forge.org>`__
++`package <https://github.com/conda-forge/fmt-feedstock>`__, as follows::
+ 
+   conda install -c conda-forge fmt
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,24 @@
+From f67783d7e6e3e6e35ea50ea64c716c6cac9b5f21 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 17 Nov 2019 10:24:55 -0800
+Subject: [PATCH 136/186] Clarify that numeric alignment is deprecated
+
+---
+ include/fmt/format.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 9c104df1..58e9e76a 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -185,6 +185,7 @@ inline uint32_t clzll(uint64_t x) {
+ FMT_END_NAMESPACE
+ #endif
+ 
++// Enable the deprecated numeric alignment.
+ #ifndef FMT_NUMERIC_ALIGN
+ #  define FMT_NUMERIC_ALIGN 1
+ #endif
+-- 
+2.21.0 (Apple Git-122.2)
+

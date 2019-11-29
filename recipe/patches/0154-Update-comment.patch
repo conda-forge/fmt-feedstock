@@ -1,0 +1,25 @@
+From 125fc5e520df4521fce6903d2dafb665658d3c39 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 20 Nov 2019 11:45:25 -0800
+Subject: [PATCH 154/186] Update comment
+
+---
+ include/fmt/printf.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index 582cf396..17a20afb 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -8,7 +8,7 @@
+ #ifndef FMT_PRINTF_H_
+ #define FMT_PRINTF_H_
+ 
+-#include <algorithm>  // std::fill_n
++#include <algorithm>  // std::max
+ #include <limits>     // std::numeric_limits
+ 
+ #include "ostream.h"
+-- 
+2.21.0 (Apple Git-122.2)
+

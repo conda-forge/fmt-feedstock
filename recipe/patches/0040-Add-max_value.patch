@@ -1,0 +1,465 @@
+From c85ae23c7398780933add6a4f3a3e176e40aef2a Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 8 Sep 2019 09:04:09 -0700
+Subject: [PATCH 040/186] Add max_value
+
+---
+ include/fmt/chrono.h             |  2 +-
+ include/fmt/format-inl.h         |  4 ++--
+ include/fmt/format.h             | 12 ++++++++----
+ include/fmt/ostream.h            |  3 +--
+ include/fmt/printf.h             | 12 ++++++------
+ include/fmt/safe-duration-cast.h |  4 ++--
+ test/format-impl-test.cc         | 11 ++++++-----
+ test/format-test.cc              | 31 ++++++++++++++++---------------
+ test/ostream-test.cc             |  4 ++--
+ test/printf-test.cc              | 28 ++++++++++++++--------------
+ 10 files changed, 58 insertions(+), 53 deletions(-)
+
+diff --git a/include/fmt/chrono.h b/include/fmt/chrono.h
+index 74a2f5c2..e0fd21b1 100644
+--- a/include/fmt/chrono.h
++++ b/include/fmt/chrono.h
+@@ -583,7 +583,7 @@ struct chrono_formatter {
+     write_sign();
+     if (isnan(value)) return write_nan();
+     uint32_or_64_or_128_t<int> n = to_unsigned(
+-        to_nonnegative_int(value, (std::numeric_limits<int>::max)()));
++        to_nonnegative_int(value, max_value<int>()));
+     int num_digits = internal::count_digits(n);
+     if (width > num_digits) out = std::fill_n(out, width - num_digits, '0');
+     out = format_decimal<char_type>(out, n, num_digits);
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index a2f47689..cef1155f 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -535,8 +535,8 @@ class bigint {
+   bigint& operator*=(uint32_t value) {
+     assert(value > 0);
+     // Verify that the computation doesn't overflow.
+-    constexpr double_bigit max32 = (std::numeric_limits<bigit>::max)();
+-    constexpr double_bigit max64 = (std::numeric_limits<double_bigit>::max)();
++    constexpr double_bigit max32 = max_value<bigit>();
++    constexpr double_bigit max64 = max_value<double_bigit>();
+     static_assert(max32 * max32 <= max64 - max32, "");
+     bigit carry = 0;
+     const double_bigit wide_value = value;
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index b65c963a..605adb7c 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -213,6 +213,11 @@ inline Dest bit_cast(const Source& source) {
+   return dest;
+ }
+ 
++// Returns the largest possible value for type T. Same as
++// std::numeric_limits<T>::max() but shorter and not affected by the max macro.
++template <typename T>
++constexpr T max_value() { return (std::numeric_limits<T>::max)(); }
++
+ // An approximation of iterator_t for pre-C++20 systems.
+ template <typename T>
+ using iterator_t = decltype(std::begin(std::declval<T&>()));
+@@ -1888,7 +1893,7 @@ FMT_CONSTEXPR int parse_nonnegative_int(const Char*& begin, const Char* end,
+   }
+   unsigned value = 0;
+   // Convert to unsigned to prevent a warning.
+-  constexpr unsigned max_int = (std::numeric_limits<int>::max)();
++  constexpr unsigned max_int = max_value<int>();
+   unsigned big = max_int / 10;
+   do {
+     // Check for overflow.
+@@ -2083,8 +2088,7 @@ template <template <typename> class Handler, typename T, typename FormatArg,
+ FMT_CONSTEXPR void set_dynamic_spec(T& value, FormatArg arg, ErrorHandler eh) {
+   unsigned long long big_value =
+       visit_format_arg(Handler<ErrorHandler>(eh), arg);
+-  if (big_value > to_unsigned((std::numeric_limits<int>::max)()))
+-    eh.on_error("number is too big");
++  if (big_value > max_value<int>()) eh.on_error("number is too big");
+   value = static_cast<T>(big_value);
+ }
+ 
+@@ -2521,7 +2525,7 @@ class format_string_checker {
+  public:
+   explicit FMT_CONSTEXPR format_string_checker(
+       basic_string_view<Char> format_str, ErrorHandler eh)
+-      : arg_id_((std::numeric_limits<unsigned>::max)()),
++      : arg_id_(max_value<unsigned>()),
+         context_(format_str, eh),
+         parse_funcs_{&parse_format_specs<Args, parse_context_type>...} {}
+ 
+diff --git a/include/fmt/ostream.h b/include/fmt/ostream.h
+index 69bac0e2..b6408921 100644
+--- a/include/fmt/ostream.h
++++ b/include/fmt/ostream.h
+@@ -75,8 +75,7 @@ void write(std::basic_ostream<Char>& os, buffer<Char>& buf) {
+   const Char* buf_data = buf.data();
+   using unsigned_streamsize = std::make_unsigned<std::streamsize>::type;
+   unsigned_streamsize size = buf.size();
+-  unsigned_streamsize max_size =
+-      to_unsigned((std::numeric_limits<std::streamsize>::max)());
++  unsigned_streamsize max_size = to_unsigned(max_value<std::streamsize>());
+   do {
+     unsigned_streamsize n = size <= max_size ? size : max_size;
+     os.write(buf_data, static_cast<std::streamsize>(n));
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index c67424a4..18f8d121 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -24,7 +24,7 @@ template <typename T> inline T const_check(T value) { return value; }
+ // signed and unsigned integers.
+ template <bool IsSigned> struct int_checker {
+   template <typename T> static bool fits_in_int(T value) {
+-    unsigned max = std::numeric_limits<int>::max();
++    unsigned max = max_value<int>();
+     return value <= max;
+   }
+   static bool fits_in_int(bool) { return true; }
+@@ -33,7 +33,7 @@ template <bool IsSigned> struct int_checker {
+ template <> struct int_checker<true> {
+   template <typename T> static bool fits_in_int(T value) {
+     return value >= std::numeric_limits<int>::min() &&
+-           value <= std::numeric_limits<int>::max();
++           value <= max_value<int>();
+   }
+   static bool fits_in_int(int) { return true; }
+ };
+@@ -163,7 +163,7 @@ template <typename Char> class printf_width_handler {
+       specs_.align = align::left;
+       width = 0 - width;
+     }
+-    unsigned int_max = std::numeric_limits<int>::max();
++    unsigned int_max = max_value<int>();
+     if (width > int_max) FMT_THROW(format_error("number is too big"));
+     return static_cast<unsigned>(width);
+   }
+@@ -339,7 +339,7 @@ template <typename OutputIt, typename Char> class basic_printf_context {
+ 
+   // Returns the argument with specified index or, if arg_index is equal
+   // to the maximum unsigned value, the next argument.
+-  format_arg get_arg(unsigned arg_index = std::numeric_limits<unsigned>::max());
++  format_arg get_arg(unsigned arg_index = internal::max_value<unsigned>());
+ 
+   // Parses argument index, flags and width and returns the argument index.
+   unsigned parse_header(const Char*& it, const Char* end, format_specs& specs);
+@@ -402,7 +402,7 @@ void basic_printf_context<OutputIt, Char>::parse_flags(format_specs& specs,
+ template <typename OutputIt, typename Char>
+ typename basic_printf_context<OutputIt, Char>::format_arg
+ basic_printf_context<OutputIt, Char>::get_arg(unsigned arg_index) {
+-  if (arg_index == std::numeric_limits<unsigned>::max())
++  if (arg_index == internal::max_value<unsigned>())
+     arg_index = parse_ctx_.next_arg_id();
+   else
+     parse_ctx_.check_arg_id(--arg_index);
+@@ -412,7 +412,7 @@ basic_printf_context<OutputIt, Char>::get_arg(unsigned arg_index) {
+ template <typename OutputIt, typename Char>
+ unsigned basic_printf_context<OutputIt, Char>::parse_header(
+     const Char*& it, const Char* end, format_specs& specs) {
+-  unsigned arg_index = std::numeric_limits<unsigned>::max();
++  unsigned arg_index = internal::max_value<unsigned>();
+   char_type c = *it;
+   if (c >= '0' && c <= '9') {
+     // Parse an argument index (if followed by '$') or a width possibly
+diff --git a/include/fmt/safe-duration-cast.h b/include/fmt/safe-duration-cast.h
+index 57a96bc6..72ec07c5 100644
+--- a/include/fmt/safe-duration-cast.h
++++ b/include/fmt/safe-duration-cast.h
+@@ -182,7 +182,7 @@ To safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
+   }
+   // multiply with Factor::num without overflow or underflow
+   if (Factor::num != 1) {
+-    const auto max1 = std::numeric_limits<IntermediateRep>::max() / Factor::num;
++    const auto max1 = internal::max_value<IntermediateRep>() / Factor::num;
+     if (count > max1) {
+       ec = 1;
+       return {};
+@@ -255,7 +255,7 @@ To safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
+ 
+   // multiply with Factor::num without overflow or underflow
+   if (Factor::num != 1) {
+-    constexpr auto max1 = std::numeric_limits<IntermediateRep>::max() /
++    constexpr auto max1 = internal::max_value<IntermediateRep>() /
+                           static_cast<IntermediateRep>(Factor::num);
+     if (count > max1) {
+       ec = 1;
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 37e5d93c..94db8d97 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -24,6 +24,7 @@
+ 
+ using fmt::internal::bigint;
+ using fmt::internal::fp;
++using fmt::internal::max_value;
+ 
+ static_assert(!std::is_copy_constructible<bigint>::value, "");
+ static_assert(!std::is_copy_assignable<bigint>::value, "");
+@@ -52,7 +53,7 @@ TEST(BigIntTest, Multiply) {
+   EXPECT_EQ("84", fmt::format("{}", n));
+   n *= 0x12345678;
+   EXPECT_EQ("962fc95e0", fmt::format("{}", n));
+-  auto max = (std::numeric_limits<uint32_t>::max)();
++  auto max = max_value<uint32_t>();
+   bigint bigmax(max);
+   bigmax *= max;
+   EXPECT_EQ("fffffffe00000001", fmt::format("{}", bigmax));
+@@ -134,7 +135,7 @@ TEST(FPTest, GetRoundDirection) {
+   EXPECT_EQ(fmt::internal::up, get_round_direction(100, 60, 10));
+   for (int i = 41; i < 60; ++i)
+     EXPECT_EQ(fmt::internal::unknown, get_round_direction(100, i, 10));
+-  uint64_t max = std::numeric_limits<uint64_t>::max();
++  uint64_t max = max_value<uint64_t>();
+   EXPECT_THROW(get_round_direction(100, 100, 0), assertion_failure);
+   EXPECT_THROW(get_round_direction(100, 0, 100), assertion_failure);
+   EXPECT_THROW(get_round_direction(100, 0, 50), assertion_failure);
+@@ -166,7 +167,7 @@ TEST(FPTest, FixedHandler) {
+   // Check that divisor - error doesn't overflow.
+   EXPECT_EQ(handler(1).on_digit('0', 100, 10, 101, exp, false), digits::error);
+   // Check that 2 * error doesn't overflow.
+-  uint64_t max = std::numeric_limits<uint64_t>::max();
++  uint64_t max = max_value<uint64_t>();
+   EXPECT_EQ(handler(1).on_digit('0', max, 10, max - 1, exp, false),
+             digits::error);
+ }
+@@ -197,7 +198,7 @@ template <typename T> struct value_extractor {
+ };
+ 
+ TEST(FormatTest, ArgConverter) {
+-  long long value = std::numeric_limits<long long>::max();
++  long long value = max_value<long long>();
+   auto arg = fmt::internal::make_arg<fmt::format_context>(value);
+   fmt::visit_format_arg(
+       fmt::internal::arg_converter<long long, fmt::format_context>(arg, 'd'),
+@@ -288,7 +289,7 @@ TEST(FormatTest, CountCodePoints) {
+ // Tests fmt::internal::count_digits for integer type Int.
+ template <typename Int> void test_count_digits() {
+   for (Int i = 0; i < 10; ++i) EXPECT_EQ(1u, fmt::internal::count_digits(i));
+-  for (Int i = 1, n = 1, end = std::numeric_limits<Int>::max() / 10; n <= end;
++  for (Int i = 1, n = 1, end = max_value<Int>() / 10; n <= end;
+        ++i) {
+     n *= 10;
+     EXPECT_EQ(i, fmt::internal::count_digits(n - 1));
+diff --git a/test/format-test.cc b/test/format-test.cc
+index bdc57886..f03a2bd6 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -35,6 +35,7 @@ using std::size_t;
+ 
+ using fmt::basic_memory_buffer;
+ using fmt::internal::basic_writer;
++using fmt::internal::max_value;
+ using fmt::format;
+ using fmt::format_error;
+ using fmt::memory_buffer;
+@@ -162,7 +163,7 @@ TEST(UtilTest, Increment) {
+ }
+ 
+ TEST(UtilTest, ParseNonnegativeInt) {
+-  if (std::numeric_limits<int>::max() !=
++  if (max_value<int>() !=
+       static_cast<int>(static_cast<unsigned>(1) << 31)) {
+     fmt::print("Skipping parse_nonnegative_int test\n");
+     return;
+@@ -477,7 +478,7 @@ TEST(UtilTest, FormatSystemError) {
+   message = fmt::memory_buffer();
+ 
+   // Check if std::allocator throws on allocating max size_t / 2 chars.
+-  size_t max_size = std::numeric_limits<size_t>::max() / 2;
++  size_t max_size = max_value<size_t>() / 2;
+   bool throws_on_alloc = false;
+   try {
+     std::allocator<char> alloc;
+@@ -527,7 +528,7 @@ TEST(UtilTest, FormatWindowsError) {
+   actual_message.resize(0);
+   fmt::internal::format_windows_error(
+       actual_message, ERROR_FILE_EXISTS,
+-      fmt::string_view(0, std::numeric_limits<size_t>::max()));
++      fmt::string_view(0, max_value<size_t>()));
+   EXPECT_EQ(fmt::format("error {}", ERROR_FILE_EXISTS),
+             fmt::to_string(actual_message));
+ }
+@@ -593,31 +594,31 @@ TEST(WriterTest, WriteInt) {
+   CHECK_WRITE(static_cast<short>(12));
+   CHECK_WRITE(34u);
+   CHECK_WRITE(std::numeric_limits<int>::min());
+-  CHECK_WRITE(std::numeric_limits<int>::max());
+-  CHECK_WRITE(std::numeric_limits<unsigned>::max());
++  CHECK_WRITE(max_value<int>());
++  CHECK_WRITE(max_value<unsigned>());
+ }
+ 
+ TEST(WriterTest, WriteLong) {
+   CHECK_WRITE(56l);
+   CHECK_WRITE(78ul);
+   CHECK_WRITE(std::numeric_limits<long>::min());
+-  CHECK_WRITE(std::numeric_limits<long>::max());
+-  CHECK_WRITE(std::numeric_limits<unsigned long>::max());
++  CHECK_WRITE(max_value<long>());
++  CHECK_WRITE(max_value<unsigned long>());
+ }
+ 
+ TEST(WriterTest, WriteLongLong) {
+   CHECK_WRITE(56ll);
+   CHECK_WRITE(78ull);
+   CHECK_WRITE(std::numeric_limits<long long>::min());
+-  CHECK_WRITE(std::numeric_limits<long long>::max());
+-  CHECK_WRITE(std::numeric_limits<unsigned long long>::max());
++  CHECK_WRITE(max_value<long long>());
++  CHECK_WRITE(max_value<unsigned long long>());
+ }
+ 
+ TEST(WriterTest, WriteDouble) {
+   CHECK_WRITE(4.2);
+   CHECK_WRITE(-4.2);
+   auto min = std::numeric_limits<double>::min();
+-  auto max = std::numeric_limits<double>::max();
++  auto max = max_value<double>();
+   if (fmt::internal::use_grisu<double>()) {
+     EXPECT_EQ("2.2250738585072014e-308", fmt::format("{}", min));
+     EXPECT_EQ("1.7976931348623157e+308", fmt::format("{}", max));
+@@ -637,7 +638,7 @@ TEST(WriterTest, WriteLongDouble) {
+   else
+     fmt::print("warning: long double formatting with std::swprintf is broken");
+   auto min = std::numeric_limits<long double>::min();
+-  auto max = std::numeric_limits<long double>::max();
++  auto max = max_value<long double>();
+   if (fmt::internal::use_grisu<long double>()) {
+     EXPECT_EQ("2.2250738585072014e-308", fmt::format("{}", min));
+     EXPECT_EQ("1.7976931348623157e+308", fmt::format("{}", max));
+@@ -1333,7 +1334,7 @@ TEST(FormatterTest, FormatBin) {
+   EXPECT_EQ("10010001101000101011001111000", format("{0:b}", 0x12345678));
+   EXPECT_EQ("10010000101010111100110111101111", format("{0:b}", 0x90ABCDEF));
+   EXPECT_EQ("11111111111111111111111111111111",
+-            format("{0:b}", std::numeric_limits<uint32_t>::max()));
++            format("{0:b}", max_value<uint32_t>()));
+ }
+ 
+ #if FMT_USE_INT128
+@@ -1465,7 +1466,7 @@ TEST(FormatterTest, FormatIntLocale) {
+   EXPECT_EQ("1,234", format("{:n}", 1234));
+   EXPECT_EQ("1,234,567", format("{:n}", 1234567));
+   EXPECT_EQ("4,294,967,295",
+-            format("{:n}", std::numeric_limits<uint32_t>::max()));
++            format("{:n}", max_value<uint32_t>()));
+ }
+ 
+ struct ConvertibleToLongLong {
+@@ -1803,9 +1804,9 @@ TEST(FormatIntTest, FormatInt) {
+   EXPECT_EQ("42", fmt::format_int(42ull).str());
+   EXPECT_EQ("-42", fmt::format_int(-42ll).str());
+   std::ostringstream os;
+-  os << std::numeric_limits<int64_t>::max();
++  os << max_value<int64_t>();
+   EXPECT_EQ(os.str(),
+-            fmt::format_int(std::numeric_limits<int64_t>::max()).str());
++            fmt::format_int(max_value<int64_t>()).str());
+ }
+ 
+ TEST(FormatTest, Print) {
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index e5e7b4c4..d1e72b5a 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -145,8 +145,8 @@ TEST(OStreamTest, WriteToOStream) {
+ }
+ 
+ TEST(OStreamTest, WriteToOStreamMaxSize) {
+-  std::size_t max_size = std::numeric_limits<std::size_t>::max();
+-  std::streamsize max_streamsize = std::numeric_limits<std::streamsize>::max();
++  std::size_t max_size = fmt::internal::max_value<std::size_t>();
++  std::streamsize max_streamsize = fmt::internal::max_value<std::streamsize>();
+   if (max_size <= fmt::internal::to_unsigned(max_streamsize)) return;
+ 
+   struct test_buffer : fmt::internal::buffer<char> {
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index 47a07692..cd9950d1 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -16,6 +16,7 @@
+ 
+ using fmt::format;
+ using fmt::format_error;
++using fmt::internal::max_value;
+ 
+ const unsigned BIG_NUM = INT_MAX + 1u;
+ 
+@@ -295,13 +296,12 @@ void TestLength(const char* length_spec, U value) {
+   long long signed_value = 0;
+   unsigned long long unsigned_value = 0;
+   // Apply integer promotion to the argument.
+-  using std::numeric_limits;
+-  unsigned long long max = numeric_limits<U>::max();
++  unsigned long long max = max_value<U>();
+   using fmt::internal::const_check;
+-  if (const_check(max <= static_cast<unsigned>(numeric_limits<int>::max()))) {
++  if (const_check(max <= static_cast<unsigned>(max_value<int>()))) {
+     signed_value = static_cast<int>(value);
+     unsigned_value = static_cast<unsigned>(value);
+-  } else if (const_check(max <= numeric_limits<unsigned>::max())) {
++  } else if (const_check(max <= max_value<unsigned>())) {
+     signed_value = static_cast<unsigned>(value);
+     unsigned_value = static_cast<unsigned>(value);
+   }
+@@ -332,25 +332,25 @@ void TestLength(const char* length_spec, U value) {
+ }
+ 
+ template <typename T> void TestLength(const char* length_spec) {
+-  T min = std::numeric_limits<T>::min(), max = std::numeric_limits<T>::max();
++  T min = std::numeric_limits<T>::min(), max = max_value<T>();
+   TestLength<T>(length_spec, 42);
+   TestLength<T>(length_spec, -42);
+   TestLength<T>(length_spec, min);
+   TestLength<T>(length_spec, max);
+   TestLength<T>(length_spec, static_cast<long long>(min) - 1);
+-  unsigned long long long_long_max = std::numeric_limits<long long>::max();
++  unsigned long long long_long_max = max_value<long long>();
+   if (static_cast<unsigned long long>(max) < long_long_max)
+     TestLength<T>(length_spec, static_cast<long long>(max) + 1);
+   TestLength<T>(length_spec, std::numeric_limits<short>::min());
+-  TestLength<T>(length_spec, std::numeric_limits<unsigned short>::max());
++  TestLength<T>(length_spec, max_value<unsigned short>());
+   TestLength<T>(length_spec, std::numeric_limits<int>::min());
+-  TestLength<T>(length_spec, std::numeric_limits<int>::max());
++  TestLength<T>(length_spec, max_value<int>());
+   TestLength<T>(length_spec, std::numeric_limits<unsigned>::min());
+-  TestLength<T>(length_spec, std::numeric_limits<unsigned>::max());
++  TestLength<T>(length_spec, max_value<unsigned>());
+   TestLength<T>(length_spec, std::numeric_limits<long long>::min());
+-  TestLength<T>(length_spec, std::numeric_limits<long long>::max());
++  TestLength<T>(length_spec, max_value<long long>());
+   TestLength<T>(length_spec, std::numeric_limits<unsigned long long>::min());
+-  TestLength<T>(length_spec, std::numeric_limits<unsigned long long>::max());
++  TestLength<T>(length_spec, max_value<unsigned long long>());
+ }
+ 
+ TEST(PrintfTest, Length) {
+@@ -366,7 +366,7 @@ TEST(PrintfTest, Length) {
+   TestLength<intmax_t>("j");
+   TestLength<std::size_t>("z");
+   TestLength<std::ptrdiff_t>("t");
+-  long double max = std::numeric_limits<long double>::max();
++  long double max = max_value<long double>();
+   EXPECT_PRINTF(fmt::format("{:.6}", max), "%g", max);
+   EXPECT_PRINTF(fmt::format("{:.6}", max), "%Lg", max);
+ }
+@@ -389,7 +389,7 @@ TEST(PrintfTest, Int) {
+ TEST(PrintfTest, long_long) {
+   // fmt::printf allows passing long long arguments to %d without length
+   // specifiers.
+-  long long max = std::numeric_limits<long long>::max();
++  long long max = max_value<long long>();
+   EXPECT_PRINTF(fmt::format("{}", max), "%d", max);
+ }
+ 
+@@ -425,7 +425,7 @@ TEST(PrintfTest, Inf) {
+ 
+ TEST(PrintfTest, Char) {
+   EXPECT_PRINTF("x", "%c", 'x');
+-  int max = std::numeric_limits<int>::max();
++  int max = max_value<int>();
+   EXPECT_PRINTF(fmt::format("{}", static_cast<char>(max)), "%c", max);
+   // EXPECT_PRINTF("x", "%lc", L'x');
+   EXPECT_PRINTF(L"x", L"%c", L'x');
+-- 
+2.21.0 (Apple Git-122.2)
+

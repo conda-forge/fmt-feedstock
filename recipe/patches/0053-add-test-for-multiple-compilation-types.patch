@@ -1,0 +1,28 @@
+From 8f27ce4d8bf2e141319d8d79dd9f252bc9924f98 Mon Sep 17 00:00:00 2001
+From: Daumantas Kavolis <12998363+dkavolis@users.noreply.github.com>
+Date: Tue, 24 Sep 2019 10:54:49 +0100
+Subject: [PATCH 053/186] add test for multiple compilation types
+
+---
+ test/compile-test.cc | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/test/compile-test.cc b/test/compile-test.cc
+index d1adc9f2..13bef488 100644
+--- a/test/compile-test.cc
++++ b/test/compile-test.cc
+@@ -117,6 +117,11 @@ TEST(CompileTest, FormattedSize) {
+   EXPECT_EQ(fmt::formatted_size(f, 42), 10);
+ }
+ 
++TEST(CompileTest, MultipleTypes) {
++  auto f = fmt::compile<int, int>("{} {}");
++  EXPECT_EQ(fmt::format(f, 42, 42), "42 42");
++}
++
+ struct formattable {};
+ 
+ FMT_BEGIN_NAMESPACE
+-- 
+2.21.0 (Apple Git-122.2)
+

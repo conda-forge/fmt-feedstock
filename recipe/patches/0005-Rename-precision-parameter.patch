@@ -1,0 +1,28 @@
+From 9e2490be4c1a8d38deca61c1c32a84f21e1a79d6 Mon Sep 17 00:00:00 2001
+From: hhb <haibohuang2010@gmail.com>
+Date: Tue, 27 Aug 2019 13:30:51 -0700
+Subject: [PATCH 005/186] Rename precision parameter
+
+To avoid clang warning:
+
+fmtlib/include/fmt/chrono.h:753:32: error: declaration shadows a field of 'formatter<duration<type-parameter-0-0, type-parameter-0-1>, type-parameter-0-2, void>' [-Werror,-Wshadow]
+---
+ include/fmt/chrono.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/chrono.h b/include/fmt/chrono.h
+index c965cf78..2b907b14 100644
+--- a/include/fmt/chrono.h
++++ b/include/fmt/chrono.h
+@@ -750,7 +750,7 @@ struct formatter<std::chrono::duration<Rep, Period>, Char> {
+     void on_fill(Char fill) { f.specs.fill[0] = fill; }
+     void on_align(align_t align) { f.specs.align = align; }
+     void on_width(unsigned width) { f.specs.width = width; }
+-    void on_precision(unsigned precision) { f.precision = precision; }
++    void on_precision(unsigned _precision) { f.precision = _precision; }
+     void end_precision() {}
+ 
+     template <typename Id> void on_dynamic_width(Id arg_id) {
+-- 
+2.21.0 (Apple Git-122.2)
+

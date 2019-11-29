@@ -1,0 +1,34 @@
+From 57cd3f72e9958cac9511d257c27050b9d4ec2e1b Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 24 Nov 2019 15:34:33 -0800
+Subject: [PATCH 168/186] Update comment
+
+---
+ include/fmt/format-inl.h | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 39233042..5e6bfdc8 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -452,6 +452,7 @@ class fp {
+ 
+ inline bool operator==(fp x, fp y) { return x.f == y.f && x.e == y.e; }
+ 
++// Computes lhs * rhs / pow(2, 64) rounded to nearest with half-up tie breaking.
+ inline uint64_t multiply(uint64_t lhs, uint64_t rhs) {
+ #if FMT_USE_INT128
+   auto product = static_cast<__uint128_t>(lhs) * rhs;
+@@ -469,9 +470,6 @@ inline uint64_t multiply(uint64_t lhs, uint64_t rhs) {
+ #endif
+ }
+ 
+-// Computes an fp number r with r.f = x.f * y.f / pow(2, 64) rounded to nearest
+-// with half-up tie breaking, r.e = x.e + y.e + 64. Result may not be
+-// normalized.
+ inline fp operator*(fp x, fp y) { return {multiply(x.f, y.f), x.e + y.e + 64}; }
+ 
+ // Returns a cached power of 10 `c_k = c_k.f * pow(2, c_k.e)` such that its
+-- 
+2.21.0 (Apple Git-122.2)
+

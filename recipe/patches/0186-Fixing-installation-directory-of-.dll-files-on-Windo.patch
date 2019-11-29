@@ -1,0 +1,27 @@
+From d19919fb73f67edb7894a4643ae3a5585241268d Mon Sep 17 00:00:00 2001
+From: Tom de Geus <tom@geus.me>
+Date: Fri, 29 Nov 2019 14:56:51 +0100
+Subject: [PATCH 186/186] Fixing installation directory of '*.dll' files on
+ Windows
+
+---
+ CMakeLists.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 9aeb4b14..1b03763e 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -252,6 +252,9 @@ if (FMT_INSTALL)
+ 
+   # Install the library and headers.
+   install(TARGETS ${INSTALL_TARGETS} EXPORT ${targets_export_name}
++          LIBRARY DESTINATION "lib"
++          ARCHIVE DESTINATION "lib"
++          RUNTIME DESTINATION "bin"
+           DESTINATION ${FMT_LIB_DIR})
+ 
+   install(FILES $<TARGET_PDB_FILE:${INSTALL_TARGETS}>
+-- 
+2.21.0 (Apple Git-122.2)
+

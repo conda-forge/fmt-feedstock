@@ -1,0 +1,62 @@
+From f29901097faaa36ed3df42f5a5f622447b8c2086 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 23 Sep 2019 11:45:07 -0700
+Subject: [PATCH 048/186] Don't use const char* overload of operator<< (#1309)
+
+---
+ include/fmt/ostream.h | 10 +++++-----
+ test/ostream-test.cc  | 12 ++++++++++++
+ 2 files changed, 17 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/ostream.h b/include/fmt/ostream.h
+index b6408921..938d1176 100644
+--- a/include/fmt/ostream.h
++++ b/include/fmt/ostream.h
+@@ -46,9 +46,9 @@ template <class Char> class formatbuf : public std::basic_streambuf<Char> {
+ 
+ template <typename Char> struct test_stream : std::basic_ostream<Char> {
+  private:
+-  struct null;
+   // Hide all operator<< from std::basic_ostream<Char>.
+-  void operator<<(null);
++  void_t<> operator<<(null<>);
++  void_t<> operator<<(const Char*);
+ };
+ 
+ // Checks if T has a user-defined operator<< (e.g. not a member of
+@@ -56,9 +56,9 @@ template <typename Char> struct test_stream : std::basic_ostream<Char> {
+ template <typename T, typename Char> class is_streamable {
+  private:
+   template <typename U>
+-  static decltype((void)(std::declval<test_stream<Char>&>()
+-                         << std::declval<U>()),
+-                  std::true_type())
++  static bool_constant<!std::is_same<decltype(std::declval<test_stream<Char>&>()
++                                              << std::declval<U>()),
++                                     void_t<>>::value>
+   test(int);
+ 
+   template <typename> static std::false_type test(...);
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index d1e72b5a..6c2bc412 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -242,3 +242,15 @@ TEST(FormatTest, UDL) {
+   EXPECT_EQ("{}"_format("test"), "test");
+ }
+ #endif
++
++template <typename T>
++struct convertible {
++  T value;
++  explicit convertible(const T& val) : value(val) {}
++  operator T() const { return value; }
++};
++
++TEST(OStreamTest, ConvertibleToCString) {
++  EXPECT_EQ("x", fmt::format("{}", convertible<char>('x')));
++  EXPECT_EQ("foo", fmt::format("{}", convertible<const char*>("foo")));
++}
+-- 
+2.21.0 (Apple Git-122.2)
+

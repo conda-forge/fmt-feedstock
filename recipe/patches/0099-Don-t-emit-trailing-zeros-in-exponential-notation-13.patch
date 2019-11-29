@@ -1,0 +1,73 @@
+From 40414b34468046ed84eb2897682d49964986c467 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 28 Oct 2019 12:31:00 -0700
+Subject: [PATCH 099/186] Don't emit trailing zeros in exponential notation
+ (#1376)
+
+---
+ include/fmt/format-inl.h | 10 +++++++++-
+ include/fmt/format.h     |  4 ----
+ test/printf-test.cc      |  4 ++--
+ 3 files changed, 11 insertions(+), 7 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index d6ecc366..b412b928 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -1070,7 +1070,15 @@ bool grisu_format(Double value, buffer<char>& buf, int precision,
+     fixed_handler handler{buf.data(), 0, precision, -cached_exp10, fixed};
+     if (grisu_gen_digits(normalized, 1, exp, handler) == digits::error)
+       return false;
+-    buf.resize(to_unsigned(handler.size));
++    int num_digits = handler.size;
++    if (!fixed) {
++      // Remove trailing zeros.
++      while (num_digits > 0 && buf[num_digits - 1] == '0') {
++        --num_digits;
++        ++exp;
++      }
++    }
++    buf.resize(to_unsigned(num_digits));
+   } else {
+     fp fp_value;
+     fp lower, upper;  // w^- and w^+ in the Grisu paper.
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index e665d612..41f9cc01 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1073,10 +1073,6 @@ template <typename Char> class grisu_writer {
+       *it++ = static_cast<Char>(*digits_);
+       if (num_digits_ > 1) *it++ = decimal_point_;
+       it = copy_str<Char>(digits_ + 1, digits_ + num_digits_, it);
+-      if (num_digits_ < params_.num_digits) {
+-        it = std::fill_n(it, params_.num_digits - num_digits_,
+-                         static_cast<Char>('0'));
+-      }
+       *it++ = static_cast<Char>(params_.upper ? 'E' : 'e');
+       return write_exponent<Char>(full_exp - 1, it);
+     }
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index d8fbc964..75101226 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -410,6 +410,7 @@ TEST(PrintfTest, Float) {
+   EXPECT_PRINTF("392.65", "%G", 392.65);
+   EXPECT_PRINTF("392", "%g", 392.0);
+   EXPECT_PRINTF("392", "%G", 392.0);
++  EXPECT_PRINTF("4.56e-07", "%g", 0.000000456);
+   safe_sprintf(buffer, "%a", -392.65);
+   EXPECT_EQ(buffer, format("{:a}", -392.65));
+   safe_sprintf(buffer, "%A", -392.65);
+@@ -588,8 +589,7 @@ class custom_printf_arg_formatter : public formatter_t {
+       if (round(value * pow(10, specs()->precision)) == 0.0) value = 0;
+   return formatter_t::operator()(value);
+ }
+-}
+-;
++};
+ 
+ typedef fmt::basic_format_args<context_t> format_args_t;
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

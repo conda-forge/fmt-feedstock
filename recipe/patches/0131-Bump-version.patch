@@ -1,0 +1,25 @@
+From b0c2ab93fa46ef48ce52958f979d00874081549e Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 17 Nov 2019 08:35:26 -0800
+Subject: [PATCH 131/186] Bump version
+
+---
+ include/fmt/core.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index e9dc7e7b..e6ad28d6 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -16,7 +16,7 @@
+ #include <type_traits>
+ 
+ // The fmt library version in the form major * 10000 + minor * 100 + patch.
+-#define FMT_VERSION 60000
++#define FMT_VERSION 60001
+ 
+ #ifdef __has_feature
+ #  define FMT_HAS_FEATURE(x) __has_feature(x)
+-- 
+2.21.0 (Apple Git-122.2)
+

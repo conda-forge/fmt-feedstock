@@ -1,0 +1,80 @@
+From 3a15ea3ea554858cd80c4709819e582791fbf232 Mon Sep 17 00:00:00 2001
+From: Orivej Desh <orivej@gmx.fr>
+Date: Sat, 12 Oct 2019 03:38:31 +0000
+Subject: [PATCH 075/186] Rename write_double to write_fp
+
+It handles all floating point types, not just doubles.
+---
+ include/fmt/format.h | 14 +++++++-------
+ test/locale-test.cc  |  2 +-
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index c8bf2e9c..12bf0f48 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1664,11 +1664,11 @@ template <typename Range> class basic_writer {
+   }
+ 
+   void write(float value, const format_specs& specs = format_specs()) {
+-    write_double(value, specs);
++    write_fp(value, specs);
+   }
+ 
+   void write(double value, const format_specs& specs = format_specs()) {
+-    write_double(value, specs);
++    write_fp(value, specs);
+   }
+ 
+   /**
+@@ -1678,12 +1678,12 @@ template <typename Range> class basic_writer {
+     \endrst
+    */
+   void write(long double value, const format_specs& specs = format_specs()) {
+-    write_double(value, specs);
++    write_fp(value, specs);
+   }
+ 
+   // Formats a floating-point number (float, double, or long double).
+   template <typename T, bool USE_GRISU = fmt::internal::use_grisu<T>()>
+-  void write_double(T value, const format_specs& specs);
++  void write_fp(T value, const format_specs& specs);
+ 
+   /** Writes a character to the buffer. */
+   void write(char value) {
+@@ -1830,7 +1830,7 @@ class arg_formatter_base {
+ 
+   template <typename T, FMT_ENABLE_IF(std::is_floating_point<T>::value)>
+   iterator operator()(T value) {
+-    writer_.write_double(value, specs_ ? *specs_ : format_specs());
++    writer_.write_fp(value, specs_ ? *specs_ : format_specs());
+     return out();
+   }
+ 
+@@ -2770,8 +2770,8 @@ struct float_spec_handler {
+ 
+ template <typename Range>
+ template <typename T, bool USE_GRISU>
+-void internal::basic_writer<Range>::write_double(T value,
+-                                                 const format_specs& specs) {
++void internal::basic_writer<Range>::write_fp(T value,
++                                             const format_specs& specs) {
+   // Check type.
+   float_spec_handler handler(static_cast<char>(specs.type));
+   internal::handle_float_type_spec(handler.type, handler);
+diff --git a/test/locale-test.cc b/test/locale-test.cc
+index 37d4687b..911da6e1 100644
+--- a/test/locale-test.cc
++++ b/test/locale-test.cc
+@@ -23,7 +23,7 @@ TEST(LocaleTest, DoubleDecimalPoint) {
+   fmt::internal::writer w(buf, fmt::internal::locale_ref(loc));
+   auto specs = fmt::format_specs();
+   specs.type = 'n';
+-  w.write_double<double, false>(1.23, specs);
++  w.write_fp<double, false>(1.23, specs);
+   EXPECT_EQ(fmt::to_string(buf), "1?23");
+ }
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

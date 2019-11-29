@@ -1,0 +1,137 @@
+From 56b5c192a0bc3c2cc656997b1a10a291aa4e04d5 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 7 Sep 2019 12:54:16 -0700
+Subject: [PATCH 035/186] Add a bigint stub and reenable grisu
+
+---
+ include/fmt/format-inl.h | 49 ++++++++++++++++++++++++++++++++++++++--
+ include/fmt/format.h     |  2 +-
+ test/format-impl-test.cc |  9 ++++++++
+ 3 files changed, 57 insertions(+), 3 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index d5587ff2..b8c6d3ac 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -466,6 +466,24 @@ FMT_FUNC fp get_cached_power(int min_exponent, int& pow10_exponent) {
+   return fp(data::pow10_significands[index], data::pow10_exponents[index]);
+ }
+ 
++class bigint {
++ private:
++  basic_memory_buffer<uint32_t> value_;
++  static FMT_CONSTEXPR_DECL const int radix = 32;
++
++  friend struct formatter<bigint>;
++
++ public:
++  explicit bigint(uint64_t n) {
++    value_.resize(2);
++    value_[0] = n & ~uint32_t(0);
++    value_[1] = static_cast<uint32_t>(n >> 32);
++  }
++
++  bigint(const bigint&) = delete;
++  void operator=(const bigint&) = delete;
++};
++
+ enum round_direction { unknown, up, down };
+ 
+ // Given the divisor (normally a power of 10), the remainder = v % divisor for
+@@ -710,7 +728,7 @@ FMT_API bool grisu_format(Double value, buffer<char>& buf, int precision,
+   if (precision != -1) {
+     if (precision > 17) return false;
+     fp_value.normalize();
+-    auto cached_pow = get_cached_power(
++    const auto cached_pow = get_cached_power(
+         min_exp - (fp_value.e + fp::significand_size), cached_exp10);
+     fp_value = fp_value * cached_pow;
+     fixed_handler handler{buf.data(), 0, precision, -cached_exp10, fixed};
+@@ -738,14 +756,18 @@ FMT_API bool grisu_format(Double value, buffer<char>& buf, int precision,
+       grisu_shortest_handler<3> handler{buf.data(), 0, (upper - fp_value).f};
+       result = grisu_gen_digits(upper, upper.f - lower.f, exp, handler);
+       size = handler.size;
++      if (result == digits::error) {
++        // TODO: use fallback
++        return false;
++      }
+     } else {
+       ++lower.f;  // \tilde{M}^- + 1 ulp -> M^-_{\uparrow}.
+       --upper.f;  // \tilde{M}^+ - 1 ulp -> M^+_{\downarrow}.
+       grisu_shortest_handler<2> handler{buf.data(), 0, (upper - fp_value).f};
+       result = grisu_gen_digits(upper, upper.f - lower.f, exp, handler);
+       size = handler.size;
++      assert(result != digits::error);
+     }
+-    if (result == digits::error) return false;
+     buf.resize(to_unsigned(size));
+   }
+   exp -= cached_exp10;
+@@ -831,6 +853,29 @@ char* sprintf_format(Double value, internal::buffer<char>& buf,
+ }
+ }  // namespace internal
+ 
++template <> struct formatter<internal::bigint> {
++  format_parse_context::iterator parse(format_parse_context& ctx) {
++    return ctx.begin();
++  }
++
++  format_context::iterator format(const internal::bigint& n,
++                                  format_context& ctx) {
++    auto out = ctx.out();
++    bool first = true;
++    for (auto i = n.value_.size(); i > 0; --i) {
++      auto value = n.value_[i - 1];
++      if (first) {
++        if (value == 0 && i > 1) continue;
++        out = format_to(out, "{:x}", value);
++        first = false;
++        continue;
++      }
++      out = format_to(out, "{:08x}", value);
++    }
++    return out;
++  }
++};
++
+ #if FMT_USE_WINDOWS_H
+ 
+ FMT_FUNC internal::utf8_to_utf16::utf8_to_utf16(string_view s) {
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index a182e906..b65c963a 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -445,7 +445,7 @@ OutputIt copy_str(InputIt begin, InputIt end, OutputIt it) {
+ }
+ 
+ #ifndef FMT_USE_GRISU
+-#  define FMT_USE_GRISU 0
++#  define FMT_USE_GRISU 1
+ #endif
+ 
+ template <typename T> constexpr bool use_grisu() {
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 5a604f4c..f7601624 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -22,8 +22,17 @@
+ 
+ #undef max
+ 
++using fmt::internal::bigint;
+ using fmt::internal::fp;
+ 
++static_assert(!std::is_copy_constructible<bigint>::value, "");
++static_assert(!std::is_copy_assignable<bigint>::value, "");
++
++TEST(BigIntTest, Construct) {
++  EXPECT_EQ("42", fmt::format("{}", bigint(0x42)));
++  EXPECT_EQ("123456789abcedf0", fmt::format("{}", bigint(0x123456789abcedf0)));
++}
++
+ template <bool is_iec559> void test_construct_from_double() {
+   fmt::print("warning: double is not IEC559, skipping FP tests\n");
+ }
+-- 
+2.21.0 (Apple Git-122.2)
+

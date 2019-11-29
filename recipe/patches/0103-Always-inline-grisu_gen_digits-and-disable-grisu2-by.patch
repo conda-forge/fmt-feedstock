@@ -1,0 +1,75 @@
+From 3487f1b9cd5df75a4e3107aa94e42602a0b63353 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 30 Oct 2019 16:52:00 -0700
+Subject: [PATCH 103/186] Always inline grisu_gen_digits and disable grisu2 by
+ default
+
+---
+ include/fmt/format-inl.h | 11 ++++++++---
+ include/fmt/format.h     |  9 +++------
+ 2 files changed, 11 insertions(+), 9 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index d683026c..083bb7b9 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -44,6 +44,10 @@
+ #  define FMT_CATCH(x) if (false)
+ #endif
+ 
++#ifndef FMT_ENABLE_GRISU2
++#  define FMT_ENABLE_GRISU2 0
++#endif
++
+ #ifdef _MSC_VER
+ #  pragma warning(push)
+ #  pragma warning(disable : 4702)  // unreachable code
+@@ -783,8 +787,8 @@ enum result {
+ // error: the size of the region (lower, upper) outside of which numbers
+ // definitely do not round to value (Delta in Grisu3).
+ template <typename Handler>
+-digits::result grisu_gen_digits(fp value, uint64_t error, int& exp,
+-                                Handler& handler) {
++FMT_ALWAYS_INLINE digits::result grisu_gen_digits(fp value, uint64_t error,
++                                                  int& exp, Handler& handler) {
+   const fp one(1ull << -value.e, value.e);
+   // The integral part of scaled value (p1 in Grisu) = value / one. It cannot be
+   // zero because it contains a product of two 64-bit numbers with MSB set (due
+@@ -1103,7 +1107,8 @@ bool grisu_format(Double value, buffer<char>& buf, int precision,
+     assert(min_exp <= upper.e && upper.e <= -32);
+     auto result = digits::result();
+     int size = 0;
+-    if ((options & grisu_options::grisu2) != 0) {
++    if (const_check(FMT_ENABLE_GRISU2 &&
++                    (options & grisu_options::grisu2) != 0)) {
+       ++lower.f;  // \tilde{M}^- + 1 ulp -> M^-_{\uparrow}.
+       --upper.f;  // \tilde{M}^+ - 1 ulp -> M^+_{\downarrow}.
+       grisu_shortest_handler<2> handler{buf.data(), 0, (upper - normalized).f};
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index d97d26bf..35b9c1c5 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -739,17 +739,14 @@ template <unsigned BITS, typename UInt> inline int count_digits(UInt n) {
+ 
+ template <> int count_digits<4>(internal::fallback_uintptr n);
+ 
+-#if FMT_HAS_CPP_ATTRIBUTE(always_inline)
+-#  define FMT_ALWAYS_INLINE __attribute__((always_inline))
++#if FMT_GCC_VERSION || FMT_CLANG_VERSION
++#  define FMT_ALWAYS_INLINE inline __attribute__((always_inline))
+ #else
+ #  define FMT_ALWAYS_INLINE
+ #endif
+ 
+-template <typename Handler>
+-inline char* lg(uint32_t n, Handler h) FMT_ALWAYS_INLINE;
+-
+ // Computes g = floor(log10(n)) and calls h.on<g>(n);
+-template <typename Handler> inline char* lg(uint32_t n, Handler h) {
++template <typename Handler> FMT_ALWAYS_INLINE char* lg(uint32_t n, Handler h) {
+   return n < 100 ? n < 10 ? h.template on<0>(n) : h.template on<1>(n)
+                  : n < 1000000
+                        ? n < 10000 ? n < 1000 ? h.template on<2>(n)
+-- 
+2.21.0 (Apple Git-122.2)
+

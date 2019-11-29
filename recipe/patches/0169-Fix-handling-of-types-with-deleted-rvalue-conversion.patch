@@ -1,0 +1,46 @@
+From 99b6e928d402379a7cda9a435649ee17261d866d Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 25 Nov 2019 08:30:47 -0800
+Subject: [PATCH 169/186] Fix handling of types with deleted rvalue conversion
+ to string (#1421)
+
+---
+ include/fmt/core.h |  2 +-
+ test/core-test.cc  | 11 +++++++++++
+ 2 files changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 738766b7..89cbbb12 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -923,7 +923,7 @@ template <typename Context> struct arg_mapper {
+ // A type constant after applying arg_mapper<Context>.
+ template <typename T, typename Context>
+ using mapped_type_constant =
+-    type_constant<decltype(arg_mapper<Context>().map(std::declval<T>())),
++    type_constant<decltype(arg_mapper<Context>().map(std::declval<const T&>())),
+                   typename Context::char_type>;
+ 
+ enum { packed_arg_bits = 5 };
+diff --git a/test/core-test.cc b/test/core-test.cc
+index c3706002..dac40a0f 100644
+--- a/test/core-test.cc
++++ b/test/core-test.cc
+@@ -649,3 +649,14 @@ TEST(FormatterTest, FormatExplicitlyConvertibleToStringLike) {
+   EXPECT_EQ("foo", fmt::format("{}", explicitly_convertible_to_string_like()));
+ }
+ #endif
++
++struct disabled_rvalue_conversion {
++  operator const char*() const& { return "foo"; }
++  operator const char*()& { return "foo"; }
++  operator const char*() const&& = delete;
++  operator const char*()&& = delete;
++};
++
++TEST(FormatterTest, DisabledRValueConversion) {
++  EXPECT_EQ("foo", fmt::format("{}", disabled_rvalue_conversion()));
++}
+-- 
+2.21.0 (Apple Git-122.2)
+

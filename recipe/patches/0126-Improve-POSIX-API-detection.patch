@@ -1,0 +1,407 @@
+From dcde089b4edaecb42c4bdd43c5b3674017a00d91 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 15 Nov 2019 05:41:14 -0800
+Subject: [PATCH 126/186] Improve POSIX API detection
+
+---
+ CMakeLists.txt           | 10 ++------
+ include/fmt/posix.h      | 10 +++++++-
+ src/posix.cc             |  6 ++++-
+ test/CMakeLists.txt      |  4 +--
+ test/format-test.cc      |  2 +-
+ test/gtest-extra-test.cc | 54 +++++++++++++++++++++-------------------
+ test/gtest-extra.cc      |  2 +-
+ test/gtest-extra.h       | 17 ++++---------
+ test/posix-mock-test.cc  |  5 +++-
+ test/posix-test.cc       |  4 +++
+ test/printf-test.cc      |  2 +-
+ test/util.cc             |  6 +++++
+ 12 files changed, 67 insertions(+), 55 deletions(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 71529e52..fd30d7ea 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -135,10 +135,8 @@ endif ()
+ 
+ include(CheckSymbolExists)
+ if (WIN32)
+-  check_symbol_exists(open io.h HAVE_OPEN)
+   check_symbol_exists(_strtod_l "${strtod_l_headers}" HAVE_STRTOD_L)
+ else ()
+-  check_symbol_exists(open fcntl.h HAVE_OPEN)
+   check_symbol_exists(strtod_l "${strtod_l_headers}" HAVE_STRTOD_L)
+ endif ()
+ 
+@@ -152,13 +150,9 @@ endfunction()
+ 
+ # Define the fmt library, its includes and the needed defines.
+ add_headers(FMT_HEADERS chrono.h color.h compile.h core.h format.h format-inl.h
+-                        locale.h ostream.h printf.h ranges.h
++                        locale.h ostream.h posix.h printf.h ranges.h
+                         safe-duration-cast.h)
+-set(FMT_SOURCES src/format.cc)
+-if (HAVE_OPEN)
+-  add_headers(FMT_HEADERS posix.h)
+-  set(FMT_SOURCES ${FMT_SOURCES} src/posix.cc)
+-endif ()
++set(FMT_SOURCES src/format.cc src/posix.cc)
+ 
+ add_library(fmt ${FMT_SOURCES} ${FMT_HEADERS} README.rst ChangeLog.rst)
+ add_library(fmt::fmt ALIAS fmt)
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index 0651f047..b90f7c6c 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -14,7 +14,6 @@
+ #endif
+ 
+ #include <cerrno>
+-#include <fcntl.h>   // for O_RDONLY
+ #include <clocale>  // for locale_t
+ #include <cstdio>
+ #include <cstdlib>  // for strtod_l
+@@ -27,6 +26,13 @@
+ 
+ #include "format.h"
+ 
++#if FMT_HAS_INCLUDE("fcntl.h")
++#  include <fcntl.h>  // for O_RDONLY
++#  define FMT_USE_FCNTL 1
++#else
++#  define FMT_USE_FCNTL 0
++#endif
++
+ #ifndef FMT_POSIX
+ #  if defined(_WIN32) && !defined(__MINGW32__)
+ // Fix warnings about deprecated symbols.
+@@ -176,6 +182,7 @@ class buffered_file {
+   }
+ };
+ 
++#if FMT_USE_FCNTL
+ // A file. Closed file is represented by a file object with descriptor -1.
+ // Methods that are not declared with FMT_NOEXCEPT may throw
+ // fmt::system_error in case of failure. Note that some errors such as
+@@ -258,6 +265,7 @@ class file {
+ 
+ // Returns the memory page size.
+ long getpagesize();
++#endif  // FMT_USE_FCNTL
+ 
+ #ifdef FMT_LOCALE
+ // A "C" numeric locale.
+diff --git a/src/posix.cc b/src/posix.cc
+index 79b8ecbe..3db72b76 100644
+--- a/src/posix.cc
++++ b/src/posix.cc
+@@ -13,6 +13,8 @@
+ #include "fmt/posix.h"
+ 
+ #include <climits>
++
++#if FMT_USE_FCNTL
+ #include <sys/stat.h>
+ #include <sys/types.h>
+ 
+@@ -39,8 +41,8 @@
+ #  ifdef __MINGW32__
+ #    define _SH_DENYNO 0x40
+ #  endif
+-
+ #endif  // _WIN32
++#endif  // FMT_USE_FCNTL
+ 
+ #ifdef fileno
+ #  undef fileno
+@@ -94,6 +96,7 @@ int buffered_file::fileno() const {
+   return fd;
+ }
+ 
++#if FMT_USE_FCNTL
+ file::file(cstring_view path, int oflag) {
+   int mode = S_IRUSR | S_IWUSR;
+ #if defined(_WIN32) && !defined(__MINGW32__)
+@@ -230,4 +233,5 @@ long getpagesize() {
+   return size;
+ #endif
+ }
++#endif  // FMT_USE_FCNTL
+ FMT_END_NAMESPACE
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 8a15135e..09645eb6 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -47,8 +47,6 @@ target_compile_definitions(gmock
+ 
+ set(TEST_MAIN_SRC test-main.cc gtest-extra.cc gtest-extra.h util.cc)
+ add_library(test-main STATIC ${TEST_MAIN_SRC})
+-target_compile_definitions(test-main PUBLIC
+-  FMT_USE_FILE_DESCRIPTORS=$<BOOL:${HAVE_OPEN}>)
+ target_include_directories(test-main SYSTEM PUBLIC gtest gmock)
+ target_link_libraries(test-main gmock fmt)
+ 
+@@ -113,7 +111,7 @@ add_fmt_test(custom-formatter-test)
+ add_fmt_test(ranges-test)
+ add_fmt_test(scan-test)
+ 
+-if (HAVE_OPEN AND NOT MSVC_BUILD_STATIC)
++if (NOT MSVC_BUILD_STATIC)
+   add_fmt_executable(posix-mock-test
+     posix-mock-test.cc ../src/format.cc ${TEST_MAIN_SRC})
+   target_include_directories(
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 0dce6bad..af7ba528 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1819,7 +1819,7 @@ TEST(FormatIntTest, FormatInt) {
+ }
+ 
+ TEST(FormatTest, Print) {
+-#if FMT_USE_FILE_DESCRIPTORS
++#if FMT_USE_FCNTL
+   EXPECT_WRITE(stdout, fmt::print("Don't {}!", "panic"), "Don't panic!");
+   EXPECT_WRITE(stderr, fmt::print(stderr, "Don't {}!", "panic"),
+                "Don't panic!");
+diff --git a/test/gtest-extra-test.cc b/test/gtest-extra-test.cc
+index 3f8fd5ea..99d1d03a 100644
+--- a/test/gtest-extra-test.cc
++++ b/test/gtest-extra-test.cc
+@@ -74,14 +74,6 @@ TEST_F(SingleEvaluationTest, FailedEXPECT_SYSTEM_ERROR) {
+   EXPECT_EQ(s_ + 1, p_);
+ }
+ 
+-// Tests that when EXPECT_WRITE fails, it evaluates its message argument
+-// exactly once.
+-TEST_F(SingleEvaluationTest, FailedEXPECT_WRITE) {
+-  EXPECT_NONFATAL_FAILURE(EXPECT_WRITE(stdout, std::printf("test"), p_++),
+-                          "01234");
+-  EXPECT_EQ(s_ + 1, p_);
+-}
+-
+ // Tests that assertion arguments are evaluated exactly once.
+ TEST_F(SingleEvaluationTest, ExceptionTests) {
+   // successful EXPECT_THROW_MSG
+@@ -163,6 +155,15 @@ TEST_F(SingleEvaluationTest, SystemErrorTests) {
+   EXPECT_EQ(4, b_);
+ }
+ 
++#if FMT_USE_FCNTL
++// Tests that when EXPECT_WRITE fails, it evaluates its message argument
++// exactly once.
++TEST_F(SingleEvaluationTest, FailedEXPECT_WRITE) {
++  EXPECT_NONFATAL_FAILURE(EXPECT_WRITE(stdout, std::printf("test"), p_++),
++                          "01234");
++  EXPECT_EQ(s_ + 1, p_);
++}
++
+ // Tests that assertion arguments are evaluated exactly once.
+ TEST_F(SingleEvaluationTest, WriteTests) {
+   // successful EXPECT_WRITE
+@@ -187,6 +188,24 @@ TEST_F(SingleEvaluationTest, WriteTests) {
+   EXPECT_EQ(2, b_);
+ }
+ 
++// Tests EXPECT_WRITE.
++TEST(ExpectTest, EXPECT_WRITE) {
++  EXPECT_WRITE(stdout, do_nothing(), "");
++  EXPECT_WRITE(stdout, std::printf("test"), "test");
++  EXPECT_WRITE(stderr, std::fprintf(stderr, "test"), "test");
++  EXPECT_NONFATAL_FAILURE(EXPECT_WRITE(stdout, std::printf("that"), "this"),
++                          "Expected: this\n"
++                          "  Actual: that");
++}
++
++TEST(StreamingAssertionsTest, EXPECT_WRITE) {
++  EXPECT_WRITE(stdout, std::printf("test"), "test") << "unexpected failure";
++  EXPECT_NONFATAL_FAILURE(EXPECT_WRITE(stdout, std::printf("test"), "other")
++                              << "expected failure",
++                          "expected failure");
++}
++#endif  // FMT_USE_FCNTL
++
+ // Tests that the compiler will not complain about unreachable code in the
+ // EXPECT_THROW_MSG macro.
+ TEST(ExpectThrowTest, DoesNotGenerateUnreachableCodeWarning) {
+@@ -280,16 +299,6 @@ TEST(ExpectTest, EXPECT_SYSTEM_ERROR) {
+           format_system_error(EDOM, "test")));
+ }
+ 
+-// Tests EXPECT_WRITE.
+-TEST(ExpectTest, EXPECT_WRITE) {
+-  EXPECT_WRITE(stdout, do_nothing(), "");
+-  EXPECT_WRITE(stdout, std::printf("test"), "test");
+-  EXPECT_WRITE(stderr, std::fprintf(stderr, "test"), "test");
+-  EXPECT_NONFATAL_FAILURE(EXPECT_WRITE(stdout, std::printf("that"), "this"),
+-                          "Expected: this\n"
+-                          "  Actual: that");
+-}
+-
+ TEST(StreamingAssertionsTest, EXPECT_THROW_MSG) {
+   EXPECT_THROW_MSG(throw_exception(), std::exception, "test")
+       << "unexpected failure";
+@@ -308,20 +317,13 @@ TEST(StreamingAssertionsTest, EXPECT_SYSTEM_ERROR) {
+       "expected failure");
+ }
+ 
+-TEST(StreamingAssertionsTest, EXPECT_WRITE) {
+-  EXPECT_WRITE(stdout, std::printf("test"), "test") << "unexpected failure";
+-  EXPECT_NONFATAL_FAILURE(EXPECT_WRITE(stdout, std::printf("test"), "other")
+-                              << "expected failure",
+-                          "expected failure");
+-}
+-
+ TEST(UtilTest, FormatSystemError) {
+   fmt::memory_buffer out;
+   fmt::format_system_error(out, EDOM, "test message");
+   EXPECT_EQ(to_string(out), format_system_error(EDOM, "test message"));
+ }
+ 
+-#if FMT_USE_FILE_DESCRIPTORS
++#if FMT_USE_FCNTL
+ 
+ using fmt::buffered_file;
+ using fmt::error_code;
+diff --git a/test/gtest-extra.cc b/test/gtest-extra.cc
+index ae89e71d..2077c2c6 100644
+--- a/test/gtest-extra.cc
++++ b/test/gtest-extra.cc
+@@ -7,7 +7,7 @@
+ 
+ #include "gtest-extra.h"
+ 
+-#if FMT_USE_FILE_DESCRIPTORS
++#if FMT_USE_FCNTL
+ 
+ using fmt::file;
+ 
+diff --git a/test/gtest-extra.h b/test/gtest-extra.h
+index 4a693361..ee335615 100644
+--- a/test/gtest-extra.h
++++ b/test/gtest-extra.h
+@@ -10,16 +10,7 @@
+ 
+ #include <string>
+ #include "gmock.h"
+-
+-#include "fmt/core.h"
+-
+-#ifndef FMT_USE_FILE_DESCRIPTORS
+-#  define FMT_USE_FILE_DESCRIPTORS 0
+-#endif
+-
+-#if FMT_USE_FILE_DESCRIPTORS
+-#  include "fmt/posix.h"
+-#endif
++#include "fmt/posix.h"
+ 
+ #define FMT_TEST_THROW_(statement, expected_exception, expected_message, fail) \
+   GTEST_AMBIGUOUS_ELSE_BLOCKER_                                                \
+@@ -65,7 +56,7 @@ std::string format_system_error(int error_code, fmt::string_view message);
+   EXPECT_THROW_MSG(statement, fmt::system_error,            \
+                    format_system_error(error_code, message))
+ 
+-#if FMT_USE_FILE_DESCRIPTORS
++#if FMT_USE_FCNTL
+ 
+ // Captures file output by redirecting it to a pipe.
+ // The output it can handle is limited by the pipe capacity.
+@@ -151,7 +142,9 @@ std::string read(fmt::file& f, std::size_t count);
+ #  define EXPECT_READ(file, expected_content) \
+     EXPECT_EQ(expected_content, read(file, std::strlen(expected_content)))
+ 
+-#endif  // FMT_USE_FILE_DESCRIPTORS
++#else
++#  define EXPECT_WRITE(file, statement, expected_output) SUCCEED()
++#endif  // FMT_USE_FCNTL
+ 
+ template <typename Mock> struct ScopedMock : testing::StrictMock<Mock> {
+   ScopedMock() { Mock::instance = this; }
+diff --git a/test/posix-mock-test.cc b/test/posix-mock-test.cc
+index 58e015aa..fbd4a687 100644
+--- a/test/posix-mock-test.cc
++++ b/test/posix-mock-test.cc
+@@ -30,7 +30,6 @@
+ 
+ using fmt::buffered_file;
+ using fmt::error_code;
+-using fmt::file;
+ 
+ using testing::_;
+ using testing::Return;
+@@ -198,6 +197,9 @@ static void write_file(fmt::cstring_view filename, fmt::string_view content) {
+   f.print("{}", content);
+ }
+ 
++#if FMT_USE_FCNTL
++using fmt::file;
++
+ TEST(UtilTest, GetPageSize) {
+ #ifdef _WIN32
+   SYSTEM_INFO si = {};
+@@ -429,6 +431,7 @@ TEST(BufferedFileTest, FilenoNoRetry) {
+   EXPECT_EQ(2, fileno_count);
+   fileno_count = 0;
+ }
++#endif  // FMT_USE_FCNTL
+ 
+ struct TestMock {
+   static TestMock* instance;
+diff --git a/test/posix-test.cc b/test/posix-test.cc
+index 9cf049b6..24d211d3 100644
+--- a/test/posix-test.cc
++++ b/test/posix-test.cc
+@@ -19,6 +19,9 @@
+ 
+ using fmt::buffered_file;
+ using fmt::error_code;
++
++#if FMT_USE_FCNTL
++
+ using fmt::file;
+ 
+ // Checks if the file is open by reading one character from it.
+@@ -376,3 +379,4 @@ TEST(LocaleTest, Strtod) {
+   EXPECT_EQ(start + 3, ptr);
+ }
+ #endif
++#endif  // FMT_USE_FCNTL
+\ No newline at end of file
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index 75101226..2d68fab4 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -477,7 +477,7 @@ enum E { A = 42 };
+ 
+ TEST(PrintfTest, Enum) { EXPECT_PRINTF("42", "%d", A); }
+ 
+-#if FMT_USE_FILE_DESCRIPTORS
++#if FMT_USE_FCNTL
+ TEST(PrintfTest, Examples) {
+   const char* weekday = "Thursday";
+   const char* month = "August";
+diff --git a/test/util.cc b/test/util.cc
+index 329f6543..e75bd450 100644
+--- a/test/util.cc
++++ b/test/util.cc
+@@ -33,11 +33,17 @@ std::string get_system_error(int error_code) {
+ const char* const FILE_CONTENT = "Don't panic!";
+ 
+ fmt::buffered_file open_buffered_file(FILE** fp) {
++#if FMT_USE_FCNTL
+   fmt::file read_end, write_end;
+   fmt::file::pipe(read_end, write_end);
+   write_end.write(FILE_CONTENT, std::strlen(FILE_CONTENT));
+   write_end.close();
+   fmt::buffered_file f = read_end.fdopen("r");
+   if (fp) *fp = f.get();
++#else
++  fmt::buffered_file f("test-file", "w");
++  fputs(FILE_CONTENT, f.get());
++  if (fp) *fp = f.get();
++#endif
+   return f;
+ }
+-- 
+2.21.0 (Apple Git-122.2)
+

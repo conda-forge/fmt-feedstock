@@ -1,0 +1,42 @@
+From 9a56a608ee6f357825c65789bd4f28e73070d70a Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 31 Aug 2019 07:10:33 -0700
+Subject: [PATCH 010/186] Fix warnings (#1288)
+
+---
+ include/fmt/safe-duration-cast.h | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/safe-duration-cast.h b/include/fmt/safe-duration-cast.h
+index aa036182..57a96bc6 100644
+--- a/include/fmt/safe-duration-cast.h
++++ b/include/fmt/safe-duration-cast.h
+@@ -62,7 +62,7 @@ FMT_CONSTEXPR To lossless_integral_conversion(const From from, int& ec) {
+ 
+   if (F::is_signed && !T::is_signed) {
+     // From may be negative, not allowed!
+-    if (from < 0) {
++    if (fmt::internal::is_negative(from)) {
+       ec = 1;
+       return {};
+     }
+@@ -182,14 +182,12 @@ To safe_duration_cast(std::chrono::duration<FromRep, FromPeriod> from,
+   }
+   // multiply with Factor::num without overflow or underflow
+   if (Factor::num != 1) {
+-    constexpr auto max1 =
+-        std::numeric_limits<IntermediateRep>::max() / Factor::num;
++    const auto max1 = std::numeric_limits<IntermediateRep>::max() / Factor::num;
+     if (count > max1) {
+       ec = 1;
+       return {};
+     }
+-    constexpr auto min1 =
+-        std::numeric_limits<IntermediateRep>::min() / Factor::num;
++    const auto min1 = std::numeric_limits<IntermediateRep>::min() / Factor::num;
+     if (count < min1) {
+       ec = 1;
+       return {};
+-- 
+2.21.0 (Apple Git-122.2)
+

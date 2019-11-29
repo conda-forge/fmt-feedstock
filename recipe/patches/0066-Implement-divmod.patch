@@ -1,0 +1,226 @@
+From e4d6d9d7c896b4edcba3e3f625d36a0befb2b15f Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 9 Oct 2019 10:31:17 -0700
+Subject: [PATCH 066/186] Implement divmod
+
+---
+ include/fmt/format-inl.h | 62 ++++++++++++++++++++++++++++------------
+ include/fmt/printf.h     |  2 +-
+ test/format-impl-test.cc | 59 ++++++++++++++++++++++++++++++++------
+ test/printf-test.cc      |  2 +-
+ 4 files changed, 97 insertions(+), 28 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 31bb4d03..9bc87279 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -511,6 +511,25 @@ class bigint {
+     bigits_.resize(num_bigits);
+   }
+ 
++  void subtract_bigits(int index, bigit other, bigit& borrow) {
++    auto result = static_cast<double_bigit>(bigits_[index]) - other - borrow;
++    bigits_[index] = static_cast<bigit>(result);
++    borrow = static_cast<bigit>(result >> (bigit_bits * 2 - 1));
++  }
++
++  // Computes *this -= other assuming aligned bigints and *this >= other.
++  void subtract_aligned(const bigint& other) {
++    FMT_ASSERT(other.exp_ >= exp_, "unaligned bigints");
++    FMT_ASSERT(*this >= other, "");
++    bigit borrow = 0;
++    int i = other.exp_ - exp_;
++    for (int j = 0, n = static_cast<int>(other.bigits_.size()); j != n;
++         ++i, ++j) {
++      subtract_bigits(i, other.bigits_[j], borrow);
++    }
++    while (borrow > 0) subtract_bigits(i, 0, borrow);
++  }
++
+  public:
+   bigint() : exp_(0) {}
+ 
+@@ -555,21 +574,20 @@ class bigint {
+     return *this;
+   }
+ 
+-  friend bool operator<=(const bigint& lhs, const bigint& rhs) {
++  friend bool operator>=(const bigint& lhs, const bigint& rhs) {
+     int num_lhs_bigits = lhs.num_bigits(), num_rhs_bigits = rhs.num_bigits();
+     if (num_lhs_bigits != num_rhs_bigits)
+-      return num_lhs_bigits < num_rhs_bigits;
++      return num_lhs_bigits > num_rhs_bigits;
+     int lhs_bigit_index = static_cast<int>(lhs.bigits_.size()) - 1;
+     int rhs_bigit_index = static_cast<int>(rhs.bigits_.size()) - 1;
+-    int end = lhs_bigit_index > rhs_bigit_index
+-                  ? lhs_bigit_index - rhs_bigit_index
+-                  : 0;
++    int end = lhs_bigit_index - rhs_bigit_index;
++    if (end < 0) end = 0;
+     for (; lhs_bigit_index >= end; --lhs_bigit_index, --rhs_bigit_index) {
+       bigit lhs_bigit = lhs.bigits_[lhs_bigit_index];
+       bigit rhs_bigit = rhs.bigits_[rhs_bigit_index];
+-      if (lhs_bigit != rhs_bigit) return lhs_bigit < rhs_bigit;
++      if (lhs_bigit != rhs_bigit) return lhs_bigit > rhs_bigit;
+     }
+-    return lhs_bigit_index <= rhs_bigit_index;
++    return lhs_bigit_index >= rhs_bigit_index;
+   }
+ 
+   // Assigns pow(10, exp) to this bigint.
+@@ -612,10 +630,8 @@ class bigint {
+     // Do the same for the top half.
+     for (int bigit_index = num_bigits; bigit_index < num_result_bigits;
+          ++bigit_index) {
+-      for (int j = num_bigits - 1, i = bigit_index - j; i < num_bigits;
+-           ++i, --j) {
+-        sum += static_cast<double_bigit>(n[i]) * n[j];
+-      }
++      for (int j = num_bigits - 1, i = bigit_index - j; i < num_bigits;)
++        sum += static_cast<double_bigit>(n[i++]) * n[j--];
+       bigits_[bigit_index] = static_cast<bigit>(sum);
+       sum >>= bits<bigit>::value;
+     }
+@@ -630,14 +646,24 @@ class bigint {
+   // Divides this bignum by divisor, assigning the remainder to this and
+   // returning the quotient.
+   int divmod_assign(const bigint& divisor) {
+-    bigit lhs_bigit = bigits_[bigits_.size() - 1];
+-    bigit rhs_bigit = divisor.bigits_[divisor.bigits_.size() - 1];
+-    // TODO: test the case of rhs == max
+-    bigit quotient =
+-        (rhs_bigit + 1 != 0) ? lhs_bigit / (rhs_bigit + 1) : lhs_bigit;
+-    while (divisor <= *this) {
+-      // TODO: subtract
++    FMT_ASSERT(this != &divisor, "");
++    if (!(*this >= divisor)) return 0;
++    int num_bigits = static_cast<int>(bigits_.size());
++    FMT_ASSERT(divisor.bigits_[divisor.bigits_.size() - 1] != 0, "");
++    int exp_difference = exp_ - divisor.exp_;
++    if (exp_difference > 0) {
++      // Align bigints by adding trailing zeros to simplify subtraction.
++      bigits_.resize(num_bigits + exp_difference);
++      for (int i = num_bigits - 1, j = i + exp_difference; i >= 0; --i, --j)
++        bigits_[j] = bigits_[i];
++      std::uninitialized_fill_n(bigits_.data(), exp_difference, 0);
++      exp_ -= exp_difference;
+     }
++    int quotient = 0;
++    do {
++      subtract_aligned(divisor);
++      ++quotient;
++    } while (*this >= divisor);
+     return quotient;
+   }
+ };
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index 6c7e328f..7d49af45 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -470,7 +470,7 @@ OutputIt basic_printf_context<OutputIt, Char>::format() {
+     // Parse argument index, flags and width.
+     unsigned arg_index = parse_header(it, end, specs);
+     if (arg_index == 0)
+-      on_error("argument index 0 is out of range");
++      on_error("argument index out of range");
+ 
+     // Parse precision.
+     if (it != end && *it == '.') {
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 15dc4bcd..cb095048 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -35,19 +35,19 @@ TEST(BigIntTest, Construct) {
+   EXPECT_EQ("123456789abcedf0", fmt::format("{}", bigint(0x123456789abcedf0)));
+ }
+ 
+-TEST(BigIntTest, LessEqual) {
++TEST(BigIntTest, GreaterEqual) {
+   bigint n1(42);
+   bigint n2(42);
+-  EXPECT_TRUE(n1 <= n2);
++  EXPECT_TRUE(n1 >= n2);
+   n2 <<= 32;
+-  EXPECT_TRUE(n1 <= n2);
+-  EXPECT_FALSE(n2 <= n1);
++  EXPECT_FALSE(n1 >= n2);
++  EXPECT_TRUE(n2 >= n1);
+   bigint n3(43);
+-  EXPECT_TRUE(n1 <= n3);
+-  EXPECT_FALSE(n3 <= n1);
++  EXPECT_FALSE(n1 >= n3);
++  EXPECT_TRUE(n3 >= n1);
+   bigint n4(42 * 0x100000001);
+-  EXPECT_TRUE(n2 <= n4);
+-  EXPECT_FALSE(n4 <= n2);
++  EXPECT_FALSE(n2 >= n4);
++  EXPECT_TRUE(n4 >= n2);
+ }
+ 
+ TEST(BigIntTest, ShiftLeft) {
+@@ -109,6 +109,49 @@ TEST(BigIntTest, Square) {
+   EXPECT_EQ("2540be400", fmt::format("{}", n4));
+ }
+ 
++TEST(BigIntTest, DivModAssignZeroDivisor) {
++  bigint zero(0);
++  EXPECT_THROW(bigint(0).divmod_assign(zero), assertion_failure);
++  EXPECT_THROW(bigint(42).divmod_assign(zero), assertion_failure);
++}
++
++TEST(BigIntTest, DivModAssignSelf) {
++  bigint n(100);
++  EXPECT_THROW(n.divmod_assign(n), assertion_failure);
++}
++
++TEST(BigIntTest, DivModAssignUnaligned) {
++  // (42 << 340) / pow(10, 100):
++  bigint n1(42);
++  n1 <<= 340;
++  bigint n2;
++  n2.assign_pow10(100);
++  int result = n1.divmod_assign(n2);
++  EXPECT_EQ(result, 9406);
++  EXPECT_EQ("10f8353019583bfc29ffc8f564e1b9f9d819dbb4cf783e4507eca1539220p96",
++            fmt::format("{}", n1));
++}
++
++TEST(BigIntTest, DivModAssign) {
++  // 100 / 10:
++  bigint n1(100);
++  int result = n1.divmod_assign(bigint(10));
++  EXPECT_EQ(result, 10);
++  EXPECT_EQ("0", fmt::format("{}", n1));
++  // pow(10, 100) / (42 << 320):
++  n1.assign_pow10(100);
++  result = n1.divmod_assign(bigint(42) <<= 320);
++  EXPECT_EQ(result, 111);
++  EXPECT_EQ("13ad2594c37ceb0b2784c4ce0bf38ace408e211a7caab24308a82e8f10p96",
++            fmt::format("{}", n1));
++  // 42 / 100:
++  bigint n2(42);
++  n1.assign_pow10(2);
++  result = n2.divmod_assign(n1);
++  EXPECT_EQ(result, 0);
++  EXPECT_EQ("2a", fmt::format("{}", n2));
++}
++
+ template <bool is_iec559> void test_construct_from_double() {
+   fmt::print("warning: double is not IEC559, skipping FP tests\n");
+ }
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index f158a627..d8fbc964 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -112,7 +112,7 @@ TEST(PrintfTest, SwitchArgIndexing) {
+ 
+ TEST(PrintfTest, InvalidArgIndex) {
+   EXPECT_THROW_MSG(test_sprintf("%0$d", 42), format_error,
+-                   "argument index 0 is out of range");
++                   "argument index out of range");
+   EXPECT_THROW_MSG(test_sprintf("%2$d", 42), format_error,
+                    "argument index out of range");
+   EXPECT_THROW_MSG(test_sprintf(format("%{}$d", INT_MAX), 42), format_error,
+-- 
+2.21.0 (Apple Git-122.2)
+

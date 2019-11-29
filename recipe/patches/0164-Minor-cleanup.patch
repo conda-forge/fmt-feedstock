@@ -1,0 +1,30 @@
+From 75fff1db64612db998ba4215cecf4bc46e43126b Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 24 Nov 2019 08:43:56 -0800
+Subject: [PATCH 164/186] Minor cleanup
+
+---
+ include/fmt/format-inl.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 7f0a291a..02ac5a5f 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -1038,11 +1038,11 @@ void fallback_format(Double d, buffer<char>& buf, int& exp10) {
+ 
+ // Formats value using the Grisu algorithm
+ // (https://www.cs.tufts.edu/~nr/cs257/archive/florian-loitsch/printf.pdf)
+-// if Float is a IEEE754 binary32 or binary64 and snprintf otherwise.
++// if T is a IEEE754 binary32 or binary64 and snprintf otherwise.
+ template <typename T>
+ int format_float(T value, int precision, float_spec spec, buffer<char>& buf) {
+-  FMT_ASSERT(value >= 0, "value is negative");
+   static_assert(!std::is_same<T, float>(), "");
++  FMT_ASSERT(value >= 0, "value is negative");
+ 
+   const bool fixed = spec.format == float_format::fixed;
+   if (value <= 0) {  // <= instead of == to silence a warning.
+-- 
+2.21.0 (Apple Git-122.2)
+

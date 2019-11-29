@@ -1,0 +1,147 @@
+From c01ec54fdef54b3eb9d24a3bcc497e680682ec7f Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 17 Nov 2019 08:54:34 -0800
+Subject: [PATCH 132/186] Document and clean basic_format_parse_context
+
+---
+ doc/api.rst        | 54 +++++++++++++++++++++++++++++++++-------------
+ include/fmt/core.h | 31 ++++++++++++++++----------
+ 2 files changed, 59 insertions(+), 26 deletions(-)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index 1c0be7ec..552f4506 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -110,31 +110,55 @@ template and implement ``parse`` and ``format`` methods::
+ 
+   struct point { double x, y; };
+ 
+-  namespace fmt {
+   template <>
+-  struct formatter<point> {
+-    constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
++  struct fmt::formatter<point> {
++    // Presentation format: 'f' - fixed, 'e' - exponential.
++    char presentation = 'f';
++
++    // Parses format specifications of the form ['f' | 'e'].
++    constexpr auto parse(format_parse_context &ctx) {
++      // [ctx.begin(), ctx.end()) is a character range that contains a part of
++      // the format string starting from the format specifications to be parsed,
++      // e.g. in
++      //
++      //   fmt::format("{:f} - point of interest", point{1, 2});
++      //
++      // the range will contain "f} - point of interest". The formatter should
++      // parse specifiers until '}' or the end of the range. In this example,
++      // the formatter should parse the 'f' specifier and return an iterator
++      // pointing to '}'.
++
++      // Parse presentation format and store the parse result in the formatter:
++      auto it = ctx.begin(), end = ctx.end();
++      if (it != end && (*it == 'f' || *it == 'e')) presentation = *it++;
++
++      // Check if reached the end of the range:
++      if (it != end && *it != '}')
++        throw format_error("invalid format");
++
++      // Return an iterator past the end of the parsed range:
++      return it;
++    }
+ 
++    // Formats the point p using parsed format specification (presentation)
++    // stored in this formatter.
+     template <typename FormatContext>
+-    auto format(const point &p, FormatContext &ctx) {
+-      return format_to(ctx.out(), "({:.1f}, {:.1f})", p.x, p.y);
+-    }
+-  };
++    auto format(const point& p, FormatContext& ctx) {
++      return format_to(
++          ctx.out(),
++          presentation == 'f' ? "({:.1f}, {:.1f})" : "({:.1e}, {:.1e})",
++          p.x, p.y);
+   }
++  };
+ 
+ Then you can pass objects of type ``point`` to any formatting function::
+ 
+   point p = {1, 2};
+-  std::string s = fmt::format("{}", p);
++  std::string s = fmt::format("{:f}", p);
+   // s == "(1.0, 2.0)"
+ 
+-In the example above the ``formatter<point>::parse`` function ignores the
+-contents of the format string referred to by ``ctx.begin()`` so the object will
+-always be formatted in the same way. See ``formatter<tm>::parse`` in
+-:file:`fmt/chrono.h` for an advanced example of how to parse the format string and
+-customize the formatted output.
+-
+-You can also reuse existing formatters, for example::
++You can also reuse existing formatters via inheritance or composition, for
++example::
+ 
+   enum class color {red, green, blue};
+ 
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index e6ad28d6..738766b7 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -479,34 +479,43 @@ class basic_format_parse_context : private ErrorHandler {
+       basic_string_view<Char> format_str, ErrorHandler eh = ErrorHandler())
+       : ErrorHandler(eh), format_str_(format_str), next_arg_id_(0) {}
+ 
+-  // Returns an iterator to the beginning of the format string range being
+-  // parsed.
++  /**
++    Returns an iterator to the beginning of the format string range being
++    parsed.
++   */
+   FMT_CONSTEXPR iterator begin() const FMT_NOEXCEPT {
+     return format_str_.begin();
+   }
+ 
+-  // Returns an iterator past the end of the format string range being parsed.
++  /**
++    Returns an iterator past the end of the format string range being parsed.
++   */
+   FMT_CONSTEXPR iterator end() const FMT_NOEXCEPT { return format_str_.end(); }
+ 
+-  // Advances the begin iterator to ``it``.
++  /** Advances the begin iterator to ``it``. */
+   FMT_CONSTEXPR void advance_to(iterator it) {
+     format_str_.remove_prefix(internal::to_unsigned(it - begin()));
+   }
+ 
+-  // Returns the next argument index.
++  /**
++    Reports an error if using the manual argument indexing; otherwise returns
++    the next argument index and switches to the automatic indexing.
++   */
+   FMT_CONSTEXPR int next_arg_id() {
+     if (next_arg_id_ >= 0) return next_arg_id_++;
+     on_error("cannot switch from manual to automatic argument indexing");
+     return 0;
+   }
+ 
+-  FMT_CONSTEXPR bool check_arg_id(int) {
+-    if (next_arg_id_ > 0) {
++  /**
++    Reports an error if using the automatic argument indexing; otherwise
++    switches to the manual indexing.
++   */
++  FMT_CONSTEXPR void check_arg_id(int) {
++    if (next_arg_id_ > 0)
+       on_error("cannot switch from automatic to manual argument indexing");
+-      return false;
+-    }
+-    next_arg_id_ = -1;
+-    return true;
++    else
++      next_arg_id_ = -1;
+   }
+ 
+   FMT_CONSTEXPR void check_arg_id(basic_string_view<Char>) {}
+-- 
+2.21.0 (Apple Git-122.2)
+

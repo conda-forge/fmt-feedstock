@@ -1,0 +1,41 @@
+From f5556225a4df3d8567334135e50706cec51a826c Mon Sep 17 00:00:00 2001
+From: Greg Sjaardema <gsjaardema@gmail.com>
+Date: Tue, 27 Aug 2019 12:46:05 -0600
+Subject: [PATCH 002/186] Eliminate shadow variable warning
+
+gcc-9 gives the following shadow warning:
+```
+In file included from /Users/libraries/ioss/src/fmt/ostream.h:12,
+                 from /Users/libraries/ioss/src/Ioss_DatabaseIO.C:59:
+/Users/libraries/ioss/src/fmt/format.h: In function 'void fmt::v6::internal::parse_format_string(fmt::v6::basic_string_view<Char>, Handler&&)':
+/Users/libraries/ioss/src/fmt/format.h:2442:10: warning: declaration of 'struct fmt::v6::internal::parse_format_string(fmt::v6::basic_string_view<Char>, Handler&&)::writer' shadows a global declaration [-Wshadow]
+ 2442 |   struct writer {
+      |          ^~~~~~
+/Users/libraries/ioss/src/fmt/format.h:1703:7: note: shadowed declaration is here
+ 1703 | using writer = basic_writer<buffer_range<char>>;
+      |       ^~~~~~
+```
+
+Since the `writer` struct is only used internally in the `parse_format_string` function, its name can be changed somewhat aribtrarily to avoid conflicts with names in an outer scope.
+
+Note that this warning is also present in the 6.0.0 release.
+---
+ include/fmt/format.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index efec5d6d..5d6be744 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2439,7 +2439,7 @@ template <typename Handler, typename Char> struct id_adapter {
+ template <bool IS_CONSTEXPR, typename Char, typename Handler>
+ FMT_CONSTEXPR void parse_format_string(basic_string_view<Char> format_str,
+                                        Handler&& handler) {
+-  struct writer {
++  struct pfs_writer {
+     FMT_CONSTEXPR void operator()(const Char* begin, const Char* end) {
+       if (begin == end) return;
+       for (;;) {
+-- 
+2.21.0 (Apple Git-122.2)
+

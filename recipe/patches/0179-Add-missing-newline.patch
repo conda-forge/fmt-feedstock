@@ -1,0 +1,23 @@
+From 9c7e2a6c6fb8168b09cb08e763a233e1f5931e60 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 27 Nov 2019 11:06:40 -0800
+Subject: [PATCH 179/186] Add missing newline
+
+---
+ test/ostream-test.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index b06ec7df..8a55d890 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -275,4 +275,4 @@ std::ostream& operator<<(std::ostream& os,
+ 
+ TEST(FormatterTest, FormatExplicitlyConvertibleToStringLikeIgnoreInserter) {
+   EXPECT_EQ("foo", fmt::format("{}", explicitly_convertible_to_string_like()));
+-}
+\ No newline at end of file
++}
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,35 @@
+From ce4d87acd4b3391eaba0242ce6faebe552a3ee3f Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 23 Oct 2019 11:15:43 -0700
+Subject: [PATCH 095/186] Remove obsolete comment and clang-format
+
+---
+ include/fmt/format.h | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 43d40dc5..53884a13 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2796,8 +2796,6 @@ void internal::basic_writer<Range>::write_fp(T value,
+   }
+ 
+   if (!std::isfinite(value)) {
+-    // Format infinity and NaN ourselves because sprintf's output is not
+-    // consistent across platforms.
+     const char* str = std::isinf(value) ? (handler.upper ? "INF" : "inf")
+                                         : (handler.upper ? "NAN" : "nan");
+     return write_padded(specs,
+@@ -2811,7 +2809,8 @@ void internal::basic_writer<Range>::write_fp(T value,
+   int precision = specs.precision >= 0 || !specs.type ? specs.precision : 6;
+   unsigned options = 0;
+   if (handler.fixed) options |= grisu_options::fixed;
+-  if (const_check(sizeof(value) == sizeof(float))) options |= grisu_options::binary32;
++  if (const_check(sizeof(value) == sizeof(float)))
++    options |= grisu_options::binary32;
+   bool use_grisu =
+       USE_GRISU &&
+       (specs.type != 'a' && specs.type != 'A' && specs.type != 'e' &&
+-- 
+2.21.0 (Apple Git-122.2)
+

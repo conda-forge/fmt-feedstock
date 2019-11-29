@@ -1,0 +1,305 @@
+From a128b5b2cb28a0a4cb063e5245903cc85c4ff967 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 1 Sep 2019 14:57:36 -0700
+Subject: [PATCH 019/186] Simplify format string compilation
+
+---
+ include/fmt/compile.h | 176 ++++++++++++++++++++----------------------
+ test/compile-test.cc  |  22 +++---
+ 2 files changed, 95 insertions(+), 103 deletions(-)
+
+diff --git a/include/fmt/compile.h b/include/fmt/compile.h
+index da2ad874..9cd6c937 100644
+--- a/include/fmt/compile.h
++++ b/include/fmt/compile.h
+@@ -172,11 +172,12 @@ template <typename Context, typename Range, typename CompiledFormat>
+ auto vformat_to(Range out, CompiledFormat& cf, basic_format_args<Context> args)
+     -> typename Context::iterator {
+   using char_type = typename Context::char_type;
+-  basic_parse_context<char_type> parse_ctx(to_string_view(cf.format_));
++  basic_parse_context<char_type> parse_ctx(to_string_view(cf.format_str_));
+   Context ctx(out.begin(), args);
+ 
+-  const auto& parts = cf.parts_provider_.parts();
+-  for (auto part_it = parts.begin(); part_it != parts.end(); ++part_it) {
++  const auto& parts = cf.parts();
++  for (auto part_it = std::begin(parts); part_it != std::end(parts);
++       ++part_it) {
+     const auto& part = *part_it;
+     const auto& value = part.val;
+ 
+@@ -188,7 +189,8 @@ auto vformat_to(Range out, CompiledFormat& cf, basic_format_args<Context> args)
+       auto&& it = reserve(output, text.size());
+       it = std::copy_n(text.begin(), text.size(), it);
+       ctx.advance_to(output);
+-    } break;
++      break;
++    }
+ 
+     case format_part_t::kind::arg_index:
+       advance_to(parse_ctx, part.arg_id_end);
+@@ -222,132 +224,120 @@ auto vformat_to(Range out, CompiledFormat& cf, basic_format_args<Context> args)
+       advance_to(parse_ctx, part.arg_id_end);
+       ctx.advance_to(
+           visit_format_arg(arg_formatter<Range>(ctx, nullptr, &specs), arg));
+-    } break;
++      break;
++    }
+     }
+   }
+   return ctx.out();
+ }
+ }  // namespace cf
+ 
+-template <typename S, typename PreparedPartsProvider, typename... Args>
+-class compiled_format {
+- private:
+-  S format_;
+-  PreparedPartsProvider parts_provider_;
+-
+-  template <typename Context, typename Range, typename CompiledFormat>
+-  friend auto cf::vformat_to(Range out, CompiledFormat& cf,
+-                             basic_format_args<Context> args) ->
+-      typename Context::iterator;
+-
+- public:
++template <typename S, typename = void> struct compiled_format_base {
+   using char_type = char_t<S>;
++  using parts_container = std::vector<internal::format_part<char_type>>;
+ 
+-  compiled_format() = delete;
+-  constexpr compiled_format(S f)
+-      : format_(std::move(f)), parts_provider_(to_string_view(format_)) {}
+-};
++  parts_container compiled_parts;
+ 
+-template <typename Format> class compiletime_prepared_parts_type_provider {
+- private:
+-  using char_type = char_t<Format>;
+-
+-// Workaround for old compilers. Compiletime parts preparation will not be
+-// performed with them anyway.
+-#if FMT_USE_CONSTEXPR
+-  static FMT_CONSTEXPR_DECL const unsigned number_of_format_parts =
+-      count_parts(to_string_view(Format()));
+-#else
+-  static const unsigned number_of_format_parts = 0u;
+-#endif
+-
+- public:
+-  template <unsigned N> struct format_parts_array {
+-    using value_type = format_part<char_type>;
+-
+-    FMT_CONSTEXPR format_parts_array() : arr{} {}
+-
+-    FMT_CONSTEXPR value_type& operator[](unsigned ind) { return arr[ind]; }
+-
+-    FMT_CONSTEXPR const value_type* begin() const { return arr; }
+-    FMT_CONSTEXPR const value_type* end() const { return begin() + N; }
+-
+-   private:
+-    value_type arr[N];
+-  };
++  explicit compiled_format_base(basic_string_view<char_type> format_str) {
++    compile_format_string<false>(format_str,
++                                 [this](const format_part<char_type>& part) {
++                                   compiled_parts.push_back(part);
++                                 });
++  }
+ 
+-  struct empty {
+-    // Parts preparator will search for it
+-    using value_type = format_part<char_type>;
+-  };
++  const parts_container& parts() const { return compiled_parts; }
++};
+ 
+-  using type = conditional_t<number_of_format_parts != 0,
+-                             format_parts_array<number_of_format_parts>, empty>;
++template <typename Char, unsigned N> struct format_part_array {
++  format_part<Char> data[N] = {};
++  FMT_CONSTEXPR format_part_array() = default;
+ };
+ 
+-template <typename PartsContainer, typename Char>
+-FMT_CONSTEXPR PartsContainer
+-prepare_compiletime_parts(basic_string_view<Char> format_str) {
++template <typename Char, unsigned N>
++FMT_CONSTEXPR format_part_array<Char, N> compile_to_parts(
++    basic_string_view<Char> format_str) {
++  format_part_array<Char, N> parts;
++  unsigned counter = 0;
+   // This is not a lambda for compatibility with older compilers.
+-  struct collector {
+-    PartsContainer& parts;
+-    unsigned counter = 0;
++  struct {
++    format_part<Char>* parts;
++    unsigned* counter;
+     FMT_CONSTEXPR void operator()(const format_part<Char>& part) {
+-      parts[counter++] = part;
++      parts[(*counter)++] = part;
+     }
+-  };
+-  PartsContainer parts;
+-  compile_format_string<true>(format_str, collector{parts});
++  } collector{parts.data, &counter};
++  compile_format_string<true>(format_str, collector);
++  if (counter < N) {
++    parts.data[counter] =
++        format_part<Char>::make_text(basic_string_view<Char>());
++  }
+   return parts;
+ }
+ 
+-template <typename Char> class runtime_parts_provider {
+- public:
+-  using parts_container = std::vector<internal::format_part<Char>>;
+-
+-  runtime_parts_provider(basic_string_view<Char> format_str) {
+-    compile_format_string<false>(
+-        format_str,
+-        [this](const format_part<Char>& part) { parts_.push_back(part); });
+-  }
++template <typename T> constexpr const T& constexpr_max(const T& a, const T& b) {
++  return (a < b) ? b : a;
++}
+ 
+-  const parts_container& parts() const { return parts_; }
++template <typename S>
++struct compiled_format_base<S, enable_if_t<is_compile_string<S>::value>> {
++  using char_type = char_t<S>;
+ 
+- private:
+-  parts_container parts_;
+-};
++  FMT_CONSTEXPR explicit compiled_format_base(basic_string_view<char_type>) {}
+ 
+-template <typename Format> struct compiletime_parts_provider {
+-  using parts_container =
+-      typename internal::compiletime_prepared_parts_type_provider<Format>::type;
++// Workaround for old compilers. Format string compilation will not be
++// performed there anyway.
++#if FMT_USE_CONSTEXPR
++  static FMT_CONSTEXPR_DECL const unsigned num_format_parts =
++      constexpr_max(count_parts(to_string_view(S())), 1u);
++#else
++  static const unsigned num_format_parts = 1;
++#endif
+ 
+-  template <typename Char>
+-  FMT_CONSTEXPR compiletime_parts_provider(basic_string_view<Char>) {}
++  using parts_container = format_part<char_type>[num_format_parts];
+ 
+   const parts_container& parts() const {
+-    static FMT_CONSTEXPR_DECL const parts_container prepared_parts =
+-        prepare_compiletime_parts<parts_container>(
+-            internal::to_string_view(Format()));
+-    return prepared_parts;
++    static FMT_CONSTEXPR_DECL const auto compiled_parts =
++        compile_to_parts<char_type, num_format_parts>(
++            internal::to_string_view(S()));
++    return compiled_parts.data;
+   }
+ };
++
++template <typename S, typename... Args>
++class compiled_format : private compiled_format_base<S> {
++ public:
++  using typename compiled_format_base<S>::char_type;
++
++ private:
++  basic_string_view<char_type> format_str_;
++
++  template <typename Context, typename Range, typename CompiledFormat>
++  friend auto cf::vformat_to(Range out, CompiledFormat& cf,
++                             basic_format_args<Context> args) ->
++      typename Context::iterator;
++
++ public:
++  compiled_format() = delete;
++  explicit constexpr compiled_format(basic_string_view<char_type> format_str)
++      : compiled_format_base<S>(format_str), format_str_(format_str) {}
++};
+ }  // namespace internal
+ 
+ #if FMT_USE_CONSTEXPR
+ template <typename... Args, typename S,
+           FMT_ENABLE_IF(is_compile_string<S>::value)>
+ FMT_CONSTEXPR auto compile(S format_str)
+-    -> internal::compiled_format<S, internal::compiletime_parts_provider<S>,
+-                                 Args...> {
+-  return format_str;
++    -> internal::compiled_format<S, Args...> {
++  return internal::compiled_format<S, Args...>(to_string_view(format_str));
+ }
+ #endif
+ 
+ // Compiles the format string which must be a string literal.
+ template <typename... Args, typename Char, size_t N>
+-auto compile(const Char (&format_str)[N]) -> internal::compiled_format<
+-    std::basic_string<Char>, internal::runtime_parts_provider<Char>, Args...> {
+-  return std::basic_string<Char>(format_str, N - 1);
++auto compile(const Char (&format_str)[N])
++    -> internal::compiled_format<const Char*, Args...> {
++  return internal::compiled_format<const Char*, Args...>(
++      basic_string_view<Char>(format_str, N - 1));
+ }
+ 
+ template <typename CompiledFormat, typename... Args,
+@@ -383,7 +373,7 @@ format_to_n_result<OutputIt> format_to_n(OutputIt out, size_t n,
+ 
+ template <typename CompiledFormat, typename... Args>
+ std::size_t formatted_size(const CompiledFormat& cf, const Args&... args) {
+-  return fmt::format_to(
++  return format_to(
+              internal::counting_iterator<typename CompiledFormat::char_type>(),
+              cf, args...)
+       .count();
+diff --git a/test/compile-test.cc b/test/compile-test.cc
+index 15ee7a28..d1adc9f2 100644
+--- a/test/compile-test.cc
++++ b/test/compile-test.cc
+@@ -39,14 +39,12 @@ using testing::StrictMock;
+ #if FMT_USE_CONSTEXPR
+ template <unsigned EXPECTED_PARTS_COUNT, typename Format>
+ void check_prepared_parts_type(Format format) {
+-  typedef fmt::internal::compiletime_prepared_parts_type_provider<decltype(
+-      format)>
+-      provider;
+-  typedef typename provider::template format_parts_array<EXPECTED_PARTS_COUNT>
+-      expected_parts_type;
+-  static_assert(
+-      std::is_same<typename provider::type, expected_parts_type>::value,
+-      "CompileTimePreparedPartsTypeProvider test failed");
++  typedef fmt::internal::compiled_format_base<decltype(format)> provider;
++  typedef fmt::internal::format_part<char>
++      expected_parts_type[EXPECTED_PARTS_COUNT];
++  static_assert(std::is_same<typename provider::parts_container,
++                             expected_parts_type>::value,
++                "CompileTimePreparedPartsTypeProvider test failed");
+ }
+ 
+ TEST(CompileTest, CompileTimePreparedPartsTypeProvider) {
+@@ -122,8 +120,7 @@ TEST(CompileTest, FormattedSize) {
+ struct formattable {};
+ 
+ FMT_BEGIN_NAMESPACE
+-template <>
+-struct formatter<formattable> : formatter<const char*> {
++template <> struct formatter<formattable> : formatter<const char*> {
+   auto format(formattable, format_context& ctx) -> decltype(ctx.out()) {
+     return formatter<const char*>::format("foo", ctx);
+   }
+@@ -134,3 +131,8 @@ TEST(CompileTest, FormatUserDefinedType) {
+   auto f = fmt::compile<formattable>("{}");
+   EXPECT_EQ(fmt::format(f, formattable()), "foo");
+ }
++
++TEST(CompileTest, EmptyFormatString) {
++  auto f = fmt::compile<>("");
++  EXPECT_EQ(fmt::format(f), "");
++}
+-- 
+2.21.0 (Apple Git-122.2)
+

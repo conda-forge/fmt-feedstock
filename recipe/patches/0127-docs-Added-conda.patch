@@ -1,0 +1,32 @@
+From 3dc8639f8ab3de7da3f849ebb09f6330fb28d941 Mon Sep 17 00:00:00 2001
+From: Tom de Geus <tom@geus.me>
+Date: Sat, 16 Nov 2019 07:30:31 +0100
+Subject: [PATCH 127/186] [docs] Added conda
+
+---
+ doc/usage.rst | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/doc/usage.rst b/doc/usage.rst
+index e71629c5..67f8d9cc 100644
+--- a/doc/usage.rst
++++ b/doc/usage.rst
+@@ -103,7 +103,14 @@ the previous section. Then compile the ``doc`` target/project, for example::
+   make doc
+ 
+ This will generate the HTML documentation in ``doc/html``.
+-  
++
++Conda
++=====
++
++fmt can be install (for Windows, macOS and Linux) on `Conda <https://docs.conda.io/en/latest/>`__, using its `conda-forge <https://conda-forge.org>`__ `package <https://github.com/conda-forge/fmt-feedstock>`__, as follows::
++
++  conda install -c conda-forge fmt
++
+ Android NDK
+ ===========
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,58 @@
+From d19ed6716d7101474e87939fe1c29b1f9d46ffd7 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 25 Nov 2019 14:57:11 -0800
+Subject: [PATCH 170/186] Fix hexfloat buffer reallocation
+
+---
+ include/fmt/format-inl.h |  4 ++--
+ test/format-test.cc      | 14 ++++++++++++++
+ 2 files changed, 16 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 5e6bfdc8..d301e972 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -1153,13 +1153,13 @@ int snprintf_float(T value, int precision, float_spec spec, buffer<char>& buf) {
+                      ? snprintf_ptr(begin, capacity, format, precision, value)
+                      : snprintf_ptr(begin, capacity, format, value);
+     if (result < 0) {
+-      buf.reserve(capacity + 1);  // The buffer will grow exponentially.
++      buf.reserve(buf.capacity() + 1);  // The buffer will grow exponentially.
+       continue;
+     }
+     unsigned size = to_unsigned(result);
+     // Size equal to capacity means that the last character was truncated.
+     if (size >= capacity) {
+-      buf.reserve(size + 1);  // Add 1 for the terminating '\0'.
++      buf.reserve(size + offset + 1);  // Add 1 for the terminating '\0'.
+       continue;
+     }
+     auto is_digit = [](char c) { return c >= '0' && c <= '9'; };
+diff --git a/test/format-test.cc b/test/format-test.cc
+index bce5539f..e747a407 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1212,6 +1212,20 @@ TEST(FormatterTest, Precision) {
+       "012970999954193198940908041656332452475714786901472678015935523861155013"
+       "480352649347201937902681071074917033322268447533357208324319361e-324",
+       format("{:.494}", 4.9406564584124654E-324));
++  EXPECT_EQ(
++      "-0X1.41FE3FFE71C9E000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000000000000000000000000"
++      "000000000000000000000000000000000000000000000000000P+127",
++      format("{:.838A}", -2.14001164E+38));
+   EXPECT_EQ("123.", format("{:#.0f}", 123.0));
+ 
+   EXPECT_THROW_MSG(format("{0:.2}", reinterpret_cast<void*>(0xcafe)),
+-- 
+2.21.0 (Apple Git-122.2)
+

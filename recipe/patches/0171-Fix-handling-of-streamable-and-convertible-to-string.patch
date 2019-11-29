@@ -1,0 +1,93 @@
+From 0d07db1234ad0c11f52153cbdf8bd989b5ec8535 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 25 Nov 2019 16:46:33 -0800
+Subject: [PATCH 171/186] Fix handling of streamable and convertible to string
+ types
+
+---
+ include/fmt/core.h   |  2 ++
+ test/core-test.cc    | 13 -------------
+ test/ostream-test.cc | 25 +++++++++++++++++++++++--
+ 3 files changed, 25 insertions(+), 15 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 89cbbb12..a73bdbb6 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -905,6 +905,8 @@ template <typename Context> struct arg_mapper {
+   }
+   template <typename T,
+             FMT_ENABLE_IF(!is_string<T>::value && !is_char<T>::value &&
++                          !std::is_constructible<basic_string_view<char_type>,
++                                                 T>::value &&
+                           (has_formatter<T, Context>::value ||
+                            has_fallback_formatter<T, Context>::value))>
+   FMT_CONSTEXPR const T& map(const T& val) {
+diff --git a/test/core-test.cc b/test/core-test.cc
+index dac40a0f..e2eec3ea 100644
+--- a/test/core-test.cc
++++ b/test/core-test.cc
+@@ -635,19 +635,6 @@ TEST(FormatterTest, FormatExplicitlyConvertibleToWStringView) {
+   EXPECT_EQ(L"foo",
+             fmt::format(L"{}", explicitly_convertible_to_wstring_view()));
+ }
+-
+-struct explicitly_convertible_to_string_like {
+-  template <typename String,
+-            typename = typename std::enable_if<std::is_constructible<
+-                String, const char*, std::size_t>::value>::type>
+-  explicit operator String() const {
+-    return String("foo", 3u);
+-  }
+-};
+-
+-TEST(FormatterTest, FormatExplicitlyConvertibleToStringLike) {
+-  EXPECT_EQ("foo", fmt::format("{}", explicitly_convertible_to_string_like()));
+-}
+ #endif
+ 
+ struct disabled_rvalue_conversion {
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index c0ed43d8..b06ec7df 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -243,8 +243,7 @@ TEST(FormatTest, UDL) {
+ }
+ #endif
+ 
+-template <typename T>
+-struct convertible {
++template <typename T> struct convertible {
+   T value;
+   explicit convertible(const T& val) : value(val) {}
+   operator T() const { return value; }
+@@ -255,3 +254,25 @@ TEST(OStreamTest, DisableBuiltinOStreamOperators) {
+   EXPECT_EQ(L"42", fmt::format(L"{:d}", convertible<unsigned short>(42)));
+   EXPECT_EQ("foo", fmt::format("{}", convertible<const char*>("foo")));
+ }
++
++struct explicitly_convertible_to_string_like {
++  template <typename String,
++            typename = typename std::enable_if<std::is_constructible<
++                String, const char*, std::size_t>::value>::type>
++  explicit operator String() const {
++    return String("foo", 3u);
++  }
++};
++
++TEST(FormatterTest, FormatExplicitlyConvertibleToStringLike) {
++  EXPECT_EQ("foo", fmt::format("{}", explicitly_convertible_to_string_like()));
++}
++
++std::ostream& operator<<(std::ostream& os,
++                         explicitly_convertible_to_string_like) {
++  return os << "bar";
++}
++
++TEST(FormatterTest, FormatExplicitlyConvertibleToStringLikeIgnoreInserter) {
++  EXPECT_EQ("foo", fmt::format("{}", explicitly_convertible_to_string_like()));
++}
+\ No newline at end of file
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,49 @@
+From 0e94b931a200e8cdf9c5b4df057295267dfc6362 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 13 Oct 2019 08:23:47 -0700
+Subject: [PATCH 077/186] Fix a linkage error introduced by #1360 (#1362)
+
+---
+ include/fmt/format-inl.h | 7 -------
+ include/fmt/format.h     | 7 +++++++
+ 2 files changed, 7 insertions(+), 7 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index c6aa1232..ba1ea970 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -1040,13 +1040,6 @@ FMT_API bool grisu_format(Double value, buffer<char>& buf, int precision,
+   return true;
+ }
+ 
+-template <>
+-char* sprintf_format<float>(float value, internal::buffer<char>& buf,
+-                            sprintf_specs specs) {
+-  // printf does not have a float format modifier, it only supports double.
+-  return sprintf_format<double>(value, buf, specs);
+-}
+-
+ template <typename Double>
+ char* sprintf_format(Double value, internal::buffer<char>& buf,
+                      sprintf_specs specs) {
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 12bf0f48..289acb08 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1138,6 +1138,13 @@ struct sprintf_specs {
+ template <typename Double>
+ char* sprintf_format(Double, internal::buffer<char>&, sprintf_specs);
+ 
++template <>
++inline char* sprintf_format<float>(float value, internal::buffer<char>& buf,
++                                   sprintf_specs specs) {
++  // printf does not have a float format specifier, it only supports double.
++  return sprintf_format<double>(value, buf, specs);
++}
++
+ template <typename Handler>
+ FMT_CONSTEXPR void handle_int_type_spec(char spec, Handler&& handler) {
+   switch (spec) {
+-- 
+2.21.0 (Apple Git-122.2)
+

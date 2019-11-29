@@ -1,0 +1,126 @@
+From 8a411c2bcabec971c4bde6761fcd5c8a2a7bf487 Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Thu, 7 Nov 2019 12:38:37 -0800
+Subject: [PATCH 114/186] [clang-tidy] Turn deleted function to public
+
+Found with modernize-use-equals-delete
+
+Signed-off-by: Rosen Penev <rosenp@gmail.com>
+---
+ include/fmt/core.h  | 15 ++++++---------
+ include/fmt/posix.h | 15 ++++++---------
+ 2 files changed, 12 insertions(+), 18 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index c481fb43..1417e941 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -552,9 +552,6 @@ using has_formatter =
+ /** A contiguous memory buffer with an optional growing ability. */
+ template <typename T> class buffer {
+  private:
+-  buffer(const buffer&) = delete;
+-  void operator=(const buffer&) = delete;
+-
+   T* ptr_;
+   std::size_t size_;
+   std::size_t capacity_;
+@@ -581,6 +578,8 @@ template <typename T> class buffer {
+   using value_type = T;
+   using const_reference = const T&;
+ 
++  buffer(const buffer&) = delete;
++  void operator=(const buffer&) = delete;
+   virtual ~buffer() {}
+ 
+   T* begin() FMT_NOEXCEPT { return ptr_; }
+@@ -1035,9 +1034,6 @@ namespace internal {
+ // A map from argument names to their values for named arguments.
+ template <typename Context> class arg_map {
+  private:
+-  arg_map(const arg_map&) = delete;
+-  void operator=(const arg_map&) = delete;
+-
+   using char_type = typename Context::char_type;
+ 
+   struct entry {
+@@ -1055,6 +1051,8 @@ template <typename Context> class arg_map {
+   }
+ 
+  public:
++  arg_map(const arg_map&) = delete;
++  void operator=(const arg_map&) = delete;
+   arg_map() : map_(nullptr), size_(0) {}
+   void init(const basic_format_args<Context>& args);
+   ~arg_map() { delete[] map_; }
+@@ -1121,14 +1119,13 @@ template <typename OutputIt, typename Char> class basic_format_context {
+   internal::arg_map<basic_format_context> map_;
+   internal::locale_ref loc_;
+ 
+-  basic_format_context(const basic_format_context&) = delete;
+-  void operator=(const basic_format_context&) = delete;
+-
+  public:
+   using iterator = OutputIt;
+   using format_arg = basic_format_arg<basic_format_context>;
+   template <typename T> using formatter_type = formatter<T, char_type>;
+ 
++  basic_format_context(const basic_format_context&) = delete;
++  void operator=(const basic_format_context&) = delete;
+   /**
+    Constructs a ``basic_format_context`` object. References to the arguments are
+    stored in the object so make sure they have appropriate lifetimes.
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index 6b2d7f8e..2512b7d1 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -132,16 +132,15 @@ class buffered_file {
+   explicit buffered_file(FILE* f) : file_(f) {}
+ 
+  public:
++  buffered_file(const buffered_file&) = delete;
++  void operator=(const buffered_file&) = delete;
++
+   // Constructs a buffered_file object which doesn't represent any file.
+   buffered_file() FMT_NOEXCEPT : file_(nullptr) {}
+ 
+   // Destroys the object closing the file it represents if any.
+   FMT_API ~buffered_file() FMT_NOEXCEPT;
+ 
+- private:
+-  buffered_file(const buffered_file&) = delete;
+-  void operator=(const buffered_file&) = delete;
+-
+  public:
+   buffered_file(buffered_file&& other) FMT_NOEXCEPT : file_(other.file_) {
+     other.file_ = nullptr;
+@@ -204,11 +203,10 @@ class file {
+   // Opens a file and constructs a file object representing this file.
+   FMT_API file(cstring_view path, int oflag);
+ 
+- private:
++ public:
+   file(const file&) = delete;
+   void operator=(const file&) = delete;
+ 
+- public:
+   file(file&& other) FMT_NOEXCEPT : fd_(other.fd_) { other.fd_ = -1; }
+ 
+   file& operator=(file&& other) {
+@@ -283,11 +281,10 @@ class Locale {
+ 
+   locale_t locale_;
+ 
+-  Locale(const Locale&) = delete;
+-  void operator=(const Locale&) = delete;
+-
+  public:
+   using type = locale_t;
++  Locale(const Locale&) = delete;
++  void operator=(const Locale&) = delete;
+ 
+   Locale() : locale_(newlocale(LC_NUMERIC_MASK, "C", nullptr)) {
+     if (!locale_) FMT_THROW(system_error(errno, "cannot create locale"));
+-- 
+2.21.0 (Apple Git-122.2)
+

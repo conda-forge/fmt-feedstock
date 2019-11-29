@@ -1,0 +1,66 @@
+From 9b7fe2a4a1f88cc58107676767235a2c67f9ef41 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 15 Nov 2019 07:32:50 -0800
+Subject: [PATCH 130/186] Don't use POSIX API on UWP
+
+---
+ include/fmt/posix.h | 9 +++++++--
+ test/CMakeLists.txt | 1 -
+ test/gtest-extra.cc | 2 +-
+ 3 files changed, 8 insertions(+), 4 deletions(-)
+
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index b90f7c6c..089e3dda 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -26,7 +26,12 @@
+ 
+ #include "format.h"
+ 
+-#if FMT_HAS_INCLUDE("fcntl.h")
++// UWP doesn't provide _pipe.
++#if FMT_HAS_INCLUDE("winapifamily.h")
++#  include <winapifamily.h>
++#endif
++#if FMT_HAS_INCLUDE("fcntl.h") && \
++    (!defined(WINAPI_FAMILY) || (WINAPI_FAMILY == WINAPI_FAMILY_DESKTOP_APP))
+ #  include <fcntl.h>  // for O_RDONLY
+ #  define FMT_USE_FCNTL 1
+ #else
+@@ -60,7 +65,7 @@
+ #ifndef _WIN32
+ #  define FMT_RETRY_VAL(result, expression, error_result) \
+     do {                                                  \
+-      (result) = (expression);                              \
++      (result) = (expression);                            \
+     } while ((result) == (error_result) && errno == EINTR)
+ #else
+ #  define FMT_RETRY_VAL(result, expression, error_result) result = (expression)
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index 09645eb6..8aab2c91 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -116,7 +116,6 @@ if (NOT MSVC_BUILD_STATIC)
+     posix-mock-test.cc ../src/format.cc ${TEST_MAIN_SRC})
+   target_include_directories(
+     posix-mock-test PRIVATE ${PROJECT_SOURCE_DIR}/include)
+-  target_compile_definitions(posix-mock-test PRIVATE FMT_USE_FILE_DESCRIPTORS=1)
+   target_link_libraries(posix-mock-test gmock)
+   target_include_directories(posix-mock-test SYSTEM PUBLIC gtest gmock)
+   if (FMT_PEDANTIC)
+diff --git a/test/gtest-extra.cc b/test/gtest-extra.cc
+index 2077c2c6..cf92852b 100644
+--- a/test/gtest-extra.cc
++++ b/test/gtest-extra.cc
+@@ -78,7 +78,7 @@ std::string read(file& f, std::size_t count) {
+   return buffer;
+ }
+ 
+-#endif  // FMT_USE_FILE_DESCRIPTORS
++#endif  // FMT_USE_FCNTL
+ 
+ std::string format_system_error(int error_code, fmt::string_view message) {
+   fmt::memory_buffer out;
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,54 @@
+From 0c7650373c9699dccf6388572dd710b06ee17411 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 4 Oct 2019 17:21:10 -0700
+Subject: [PATCH 061/186] Fix handling of types convertible to std::string_view
+
+---
+ include/fmt/core.h |  8 ++++++++
+ test/core-test.cc  | 11 +++++++++++
+ 2 files changed, 19 insertions(+)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 0d7d15b5..8cdc9cdc 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -828,6 +828,14 @@ template <typename Context> struct arg_mapper {
+   FMT_CONSTEXPR basic_string_view<char_type> map(const T& val) {
+     return basic_string_view<char_type>(val);
+   }
++  template <typename T,
++            FMT_ENABLE_IF(
++                std::is_constructible<std_string_view<char_type>, T>::value &&
++                !std::is_constructible<basic_string_view<char_type>, T>::value &&
++                !is_string<T>::value)>
++  FMT_CONSTEXPR basic_string_view<char_type> map(const T& val) {
++    return std_string_view<char_type>(val);
++  }
+   FMT_CONSTEXPR const char* map(const signed char* val) {
+     static_assert(std::is_same<char_type, char>::value, "invalid string type");
+     return reinterpret_cast<const char*>(val);
+diff --git a/test/core-test.cc b/test/core-test.cc
+index 0de26dbe..84d2b9eb 100644
+--- a/test/core-test.cc
++++ b/test/core-test.cc
+@@ -613,6 +613,17 @@ TEST(FormatterTest, FormatExplicitlyConvertibleToStringView) {
+   EXPECT_EQ("foo", fmt::format("{}", explicitly_convertible_to_string_view()));
+ }
+ 
++#ifdef FMT_USE_STRING_VIEW
++struct explicitly_convertible_to_std_string_view {
++  explicit operator std::string_view() const { return "foo"; }
++};
++
++TEST(FormatterTest, FormatExplicitlyConvertibleToStdStringView) {
++  EXPECT_EQ("foo",
++            fmt::format("{}", explicitly_convertible_to_std_string_view()));
++}
++#endif
++
+ struct explicitly_convertible_to_wstring_view {
+   explicit operator fmt::wstring_view() const { return L"foo"; }
+ };
+-- 
+2.21.0 (Apple Git-122.2)
+

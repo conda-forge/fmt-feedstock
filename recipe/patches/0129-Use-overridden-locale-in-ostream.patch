@@ -1,0 +1,52 @@
+From c58b7d9c2fce8fdf2d5e08e84ae2a020ae5cddd6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Daniel=20La=C3=BCgt?= <daniel.laugt@gmail.com>
+Date: Wed, 13 Nov 2019 13:08:47 +0100
+Subject: [PATCH 129/186] Use overridden locale in ostream
+
+---
+ include/fmt/core.h    | 2 ++
+ include/fmt/ostream.h | 6 ++++--
+ 2 files changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 7e6de98f..e9dc7e7b 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -1076,6 +1076,8 @@ class locale_ref {
+   locale_ref() : locale_(nullptr) {}
+   template <typename Locale> explicit locale_ref(const Locale& loc);
+ 
++  explicit operator bool() const FMT_NOEXCEPT { return locale_ != nullptr; }
++
+   template <typename Locale> Locale get() const;
+ };
+ 
+diff --git a/include/fmt/ostream.h b/include/fmt/ostream.h
+index 18ae820c..72d078b2 100644
+--- a/include/fmt/ostream.h
++++ b/include/fmt/ostream.h
+@@ -89,9 +89,11 @@ void write(std::basic_ostream<Char>& os, buffer<Char>& buf) {
+ }
+ 
+ template <typename Char, typename T>
+-void format_value(buffer<Char>& buf, const T& value) {
++void format_value(buffer<Char>& buf, const T& value,
++                  locale_ref loc = locale_ref()) {
+   formatbuf<Char> format_buf(buf);
+   std::basic_ostream<Char> output(&format_buf);
++  if (loc) output.imbue(loc.get<std::locale>());
+   output.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+   output << value;
+   buf.resize(buf.size());
+@@ -104,7 +106,7 @@ struct fallback_formatter<T, Char, enable_if_t<is_streamable<T, Char>::value>>
+   template <typename Context>
+   auto format(const T& value, Context& ctx) -> decltype(ctx.out()) {
+     basic_memory_buffer<Char> buffer;
+-    format_value(buffer, value);
++    format_value(buffer, value, ctx.locale());
+     basic_string_view<Char> str(buffer.data(), buffer.size());
+     return formatter<basic_string_view<Char>, Char>::format(str, ctx);
+   }
+-- 
+2.21.0 (Apple Git-122.2)
+

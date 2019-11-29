@@ -1,0 +1,26 @@
+From d0696b0aa6ff6fb2440976ab40f6f4d6343aaf98 Mon Sep 17 00:00:00 2001
+From: Ivan Shynkarenka <chronoxor@gmail.com>
+Date: Wed, 20 Nov 2019 11:10:33 +0300
+Subject: [PATCH 147/186] warning C4456: declaration of 'num_digits' hides
+ previous local declaration
+
+---
+ include/fmt/format.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 6191592c..4c5c9f7c 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2872,7 +2872,7 @@ void internal::basic_writer<Range>::write_fp(T value,
+           fspec.format == float_format::exp)) ||
+         specs.alt;
+     params.upper = fspec.upper;
+-    int num_digits = static_cast<int>(buffer.size());
++    num_digits = static_cast<int>(buffer.size());
+     write_padded(as, grisu_writer<char_type>(buffer.data(), num_digits, exp,
+                                              params, decimal_point));
+   } else {
+-- 
+2.21.0 (Apple Git-122.2)
+

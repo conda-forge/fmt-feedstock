@@ -1,0 +1,25 @@
+From 1409dfe76b0819b9609e8a91441453ddbb8ee2d3 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Tue, 5 Nov 2019 07:40:06 +0000
+Subject: [PATCH 110/186] Try fix CI
+
+---
+ .travis.yml | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/.travis.yml b/.travis.yml
+index 27a83c19..816d14fb 100644
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -117,7 +117,7 @@ matrix:
+         - source "$HOME/.sdkman/bin/sdkman-init.sh"
+         - sdk version
+         - sdk install gradle
+-        - sdk use gradle
++        #- sdk use gradle
+         - gradle --version
+       install:
+         # Accept SDK Licenses + Install NDK
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,329 @@
+From ffd05e65ed256979584d18ed8ec460e0ef86cec5 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 4 Nov 2019 11:37:40 +0000
+Subject: [PATCH 108/186] basic_parse_context -> basic_format_parse_context per
+ standard and document
+
+---
+ doc/api.rst           |  5 +++--
+ include/fmt/chrono.h  |  8 ++++----
+ include/fmt/compile.h | 14 ++++++++------
+ include/fmt/core.h    | 44 +++++++++++++++++++++++++++++--------------
+ include/fmt/format.h  | 27 +++++++++++++-------------
+ include/fmt/printf.h  |  4 ++--
+ 6 files changed, 61 insertions(+), 41 deletions(-)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index 247d0ee7..2499096a 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -113,8 +113,7 @@ template and implement ``parse`` and ``format`` methods::
+   namespace fmt {
+   template <>
+   struct formatter<point> {
+-    template <typename ParseContext>
+-    constexpr auto parse(ParseContext &ctx) { return ctx.begin(); }
++    constexpr auto parse(format_parse_context &ctx) { return ctx.begin(); }
+ 
+     template <typename FormatContext>
+     auto format(const point &p, FormatContext &ctx) {
+@@ -183,6 +182,8 @@ You can also write a formatter for a hierarchy of classes::
+     fmt::print("{}", a); // prints "B"
+   }
+ 
++.. doxygenclass: fmt::basic_format_parse_context
++
+ Output Iterator Support
+ -----------------------
+ 
+diff --git a/include/fmt/chrono.h b/include/fmt/chrono.h
+index 671d2f33..c88933b2 100644
+--- a/include/fmt/chrono.h
++++ b/include/fmt/chrono.h
+@@ -728,7 +728,7 @@ struct formatter<std::chrono::duration<Rep, Period>, Char> {
+ 
+   struct spec_handler {
+     formatter& f;
+-    basic_parse_context<Char>& context;
++    basic_format_parse_context<Char>& context;
+     basic_string_view<Char> format_str;
+ 
+     template <typename Id> FMT_CONSTEXPR arg_ref_type make_arg_ref(Id arg_id) {
+@@ -761,13 +761,13 @@ struct formatter<std::chrono::duration<Rep, Period>, Char> {
+     }
+   };
+ 
+-  using iterator = typename basic_parse_context<Char>::iterator;
++  using iterator = typename basic_format_parse_context<Char>::iterator;
+   struct parse_range {
+     iterator begin;
+     iterator end;
+   };
+ 
+-  FMT_CONSTEXPR parse_range do_parse(basic_parse_context<Char>& ctx) {
++  FMT_CONSTEXPR parse_range do_parse(basic_format_parse_context<Char>& ctx) {
+     auto begin = ctx.begin(), end = ctx.end();
+     if (begin == end || *begin == '}') return {begin, begin};
+     spec_handler handler{*this, ctx, format_str};
+@@ -788,7 +788,7 @@ struct formatter<std::chrono::duration<Rep, Period>, Char> {
+  public:
+   formatter() : precision(-1) {}
+ 
+-  FMT_CONSTEXPR auto parse(basic_parse_context<Char>& ctx)
++  FMT_CONSTEXPR auto parse(basic_format_parse_context<Char>& ctx)
+       -> decltype(ctx.begin()) {
+     auto range = do_parse(ctx);
+     format_str = basic_string_view<Char>(
+diff --git a/include/fmt/compile.h b/include/fmt/compile.h
+index cb327057..f65f5a74 100644
+--- a/include/fmt/compile.h
++++ b/include/fmt/compile.h
+@@ -101,7 +101,7 @@ class format_string_compiler : public error_handler {
+   PartHandler handler_;
+   part part_;
+   basic_string_view<Char> format_str_;
+-  basic_parse_context<Char> parse_context_;
++  basic_format_parse_context<Char> parse_context_;
+ 
+  public:
+   FMT_CONSTEXPR format_string_compiler(basic_string_view<Char> format_str,
+@@ -136,8 +136,8 @@ class format_string_compiler : public error_handler {
+   FMT_CONSTEXPR const Char* on_format_specs(const Char* begin,
+                                             const Char* end) {
+     auto repl = typename part::replacement();
+-    dynamic_specs_handler<basic_parse_context<Char>> handler(repl.specs,
+-                                                             parse_context_);
++    dynamic_specs_handler<basic_format_parse_context<Char>> handler(
++        repl.specs, parse_context_);
+     auto it = parse_format_specs(begin, end, handler);
+     if (*it != '}') on_error("missing '}' in format string");
+     repl.arg_id = part_.part_kind == part::kind::arg_index
+@@ -160,8 +160,9 @@ FMT_CONSTEXPR void compile_format_string(basic_string_view<Char> format_str,
+ }
+ 
+ template <typename Range, typename Context, typename Id>
+-void format_arg(basic_parse_context<typename Range::value_type>& parse_ctx,
+-                Context& ctx, Id arg_id) {
++void format_arg(
++    basic_format_parse_context<typename Range::value_type>& parse_ctx,
++    Context& ctx, Id arg_id) {
+   ctx.advance_to(
+       visit_format_arg(arg_formatter<Range>(ctx, &parse_ctx), ctx.arg(arg_id)));
+ }
+@@ -172,7 +173,8 @@ template <typename Context, typename Range, typename CompiledFormat>
+ auto vformat_to(Range out, CompiledFormat& cf, basic_format_args<Context> args)
+     -> typename Context::iterator {
+   using char_type = typename Context::char_type;
+-  basic_parse_context<char_type> parse_ctx(to_string_view(cf.format_str_));
++  basic_format_parse_context<char_type> parse_ctx(
++      to_string_view(cf.format_str_));
+   Context ctx(out.begin(), args);
+ 
+   const auto& parts = cf.parts();
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 49776c18..fc0367fa 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -448,10 +448,22 @@ struct error_handler {
+ /** String's character type. */
+ template <typename S> using char_t = typename internal::char_t_impl<S>::type;
+ 
+-// Parsing context consisting of a format string range being parsed and an
+-// argument counter for automatic indexing.
++/**
++  Parsing context consisting of a format string range being parsed and an
++  argument counter for automatic indexing.
++
++  You can use one of the following type aliases for common character types:
++
++  +-----------------------+-------------------------------------+
++  | Type                  | Definition                          |
++  +=======================+=====================================+
++  | format_parse_context  | basic_format_parse_context<char>    |
++  +-----------------------+-------------------------------------+
++  | wformat_parse_context | basic_format_parse_context<wchar_t> |
++  +-----------------------+-------------------------------------+
++ */
+ template <typename Char, typename ErrorHandler = internal::error_handler>
+-class basic_parse_context : private ErrorHandler {
++class basic_format_parse_context : private ErrorHandler {
+  private:
+   basic_string_view<Char> format_str_;
+   int next_arg_id_;
+@@ -460,8 +472,8 @@ class basic_parse_context : private ErrorHandler {
+   using char_type = Char;
+   using iterator = typename basic_string_view<Char>::iterator;
+ 
+-  explicit FMT_CONSTEXPR basic_parse_context(basic_string_view<Char> format_str,
+-                                             ErrorHandler eh = ErrorHandler())
++  explicit FMT_CONSTEXPR basic_format_parse_context(
++      basic_string_view<Char> format_str, ErrorHandler eh = ErrorHandler())
+       : ErrorHandler(eh), format_str_(format_str), next_arg_id_(0) {}
+ 
+   // Returns an iterator to the beginning of the format string range being
+@@ -503,11 +515,14 @@ class basic_parse_context : private ErrorHandler {
+   FMT_CONSTEXPR ErrorHandler error_handler() const { return *this; }
+ };
+ 
+-using format_parse_context = basic_parse_context<char>;
+-using wformat_parse_context = basic_parse_context<wchar_t>;
++using format_parse_context = basic_format_parse_context<char>;
++using wformat_parse_context = basic_format_parse_context<wchar_t>;
+ 
+-using parse_context FMT_DEPRECATED_ALIAS = basic_parse_context<char>;
+-using wparse_context FMT_DEPRECATED_ALIAS = basic_parse_context<wchar_t>;
++template <typename Char, typename ErrorHandler = internal::error_handler>
++using basic_parse_context FMT_DEPRECATED_ALIAS =
++    basic_format_parse_context<Char, ErrorHandler>;
++using parse_context FMT_DEPRECATED_ALIAS = basic_format_parse_context<char>;
++using wparse_context FMT_DEPRECATED_ALIAS = basic_format_parse_context<wchar_t>;
+ 
+ template <typename Context> class basic_format_arg;
+ template <typename Context> class basic_format_args;
+@@ -714,7 +729,7 @@ template <typename Char> struct string_value {
+ };
+ 
+ template <typename Context> struct custom_value {
+-  using parse_context = basic_parse_context<typename Context::char_type>;
++  using parse_context = basic_format_parse_context<typename Context::char_type>;
+   const void* value;
+   void (*format)(const void* arg, parse_context& parse_ctx, Context& ctx);
+ };
+@@ -776,9 +791,9 @@ template <typename Context> class value {
+  private:
+   // Formats an argument of a custom type, such as a user-defined class.
+   template <typename T, typename Formatter>
+-  static void format_custom_arg(const void* arg,
+-                                basic_parse_context<char_type>& parse_ctx,
+-                                Context& ctx) {
++  static void format_custom_arg(
++      const void* arg, basic_format_parse_context<char_type>& parse_ctx,
++      Context& ctx) {
+     Formatter f;
+     parse_ctx.advance_to(f.parse(parse_ctx));
+     ctx.advance_to(f.format(*static_cast<const T*>(arg), ctx));
+@@ -934,7 +949,8 @@ template <typename Context> class basic_format_arg {
+    public:
+     explicit handle(internal::custom_value<Context> custom) : custom_(custom) {}
+ 
+-    void format(basic_parse_context<char_type>& parse_ctx, Context& ctx) const {
++    void format(basic_format_parse_context<char_type>& parse_ctx,
++                Context& ctx) const {
+       custom_.format(custom_.value, parse_ctx, ctx);
+     }
+ 
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 4c9e33fd..cb1190fa 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1747,8 +1747,8 @@ template <typename Range> class basic_writer {
+     const Char* data = s.data();
+     std::size_t size = s.size();
+     if (specs.precision >= 0 && internal::to_unsigned(specs.precision) < size)
+-      size = internal::code_point_index(s,
+-                                        internal::to_unsigned(specs.precision));
++      size =
++          internal::code_point_index(s, internal::to_unsigned(specs.precision));
+     write(data, size, specs);
+   }
+ 
+@@ -1945,11 +1945,11 @@ template <typename Context> class custom_formatter {
+  private:
+   using char_type = typename Context::char_type;
+ 
+-  basic_parse_context<char_type>& parse_ctx_;
++  basic_format_parse_context<char_type>& parse_ctx_;
+   Context& ctx_;
+ 
+  public:
+-  explicit custom_formatter(basic_parse_context<char_type>& parse_ctx,
++  explicit custom_formatter(basic_format_parse_context<char_type>& parse_ctx,
+                             Context& ctx)
+       : parse_ctx_(parse_ctx), ctx_(ctx) {}
+ 
+@@ -2586,7 +2586,7 @@ class format_string_checker {
+   }
+ 
+  private:
+-  using parse_context_type = basic_parse_context<Char, ErrorHandler>;
++  using parse_context_type = basic_format_parse_context<Char, ErrorHandler>;
+   enum { num_args = sizeof...(Args) };
+ 
+   FMT_CONSTEXPR void check_arg_id() {
+@@ -2652,7 +2652,7 @@ class arg_formatter : public internal::arg_formatter_base<Range> {
+   using context_type = basic_format_context<typename base::iterator, char_type>;
+ 
+   context_type& ctx_;
+-  basic_parse_context<char_type>* parse_ctx_;
++  basic_format_parse_context<char_type>* parse_ctx_;
+ 
+  public:
+   using range = Range;
+@@ -2666,9 +2666,10 @@ class arg_formatter : public internal::arg_formatter_base<Range> {
+     *specs* contains format specifier information for standard argument types.
+     \endrst
+    */
+-  explicit arg_formatter(context_type& ctx,
+-                         basic_parse_context<char_type>* parse_ctx = nullptr,
+-                         format_specs* specs = nullptr)
++  explicit arg_formatter(
++      context_type& ctx,
++      basic_format_parse_context<char_type>* parse_ctx = nullptr,
++      format_specs* specs = nullptr)
+       : base(Range(ctx.out()), specs, ctx.locale()),
+         ctx_(ctx),
+         parse_ctx_(parse_ctx) {}
+@@ -3189,8 +3190,8 @@ basic_format_context<Range, Char>::arg(basic_string_view<char_type> name) {
+ }
+ 
+ template <typename Char, typename ErrorHandler>
+-FMT_CONSTEXPR void advance_to(basic_parse_context<Char, ErrorHandler>& ctx,
+-                              const Char* p) {
++FMT_CONSTEXPR void advance_to(
++    basic_format_parse_context<Char, ErrorHandler>& ctx, const Char* p) {
+   ctx.advance_to(ctx.begin() + (p - &*ctx.begin()));
+ }
+ 
+@@ -3232,7 +3233,7 @@ struct format_handler : internal::error_handler {
+     if (visit_format_arg(f, arg)) return parse_context.begin();
+     basic_format_specs<Char> specs;
+     using internal::specs_handler;
+-    using parse_context_t = basic_parse_context<Char>;
++    using parse_context_t = basic_format_parse_context<Char>;
+     internal::specs_checker<specs_handler<parse_context_t, Context>> handler(
+         specs_handler<parse_context_t, Context>(specs, parse_context, context),
+         arg.type());
+@@ -3244,7 +3245,7 @@ struct format_handler : internal::error_handler {
+     return begin;
+   }
+ 
+-  basic_parse_context<Char> parse_context;
++  basic_format_parse_context<Char> parse_context;
+   Context context;
+   basic_format_arg<Context> arg;
+ };
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index 5b5f32ea..582cf396 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -328,7 +328,7 @@ template <typename OutputIt, typename Char> class basic_printf_context {
+ 
+   OutputIt out_;
+   basic_format_args<basic_printf_context> args_;
+-  basic_parse_context<Char> parse_ctx_;
++  basic_format_parse_context<Char> parse_ctx_;
+ 
+   static void parse_flags(format_specs& specs, const Char*& it,
+                           const Char* end);
+@@ -357,7 +357,7 @@ template <typename OutputIt, typename Char> class basic_printf_context {
+ 
+   format_arg arg(unsigned id) const { return args_.get(id); }
+ 
+-  basic_parse_context<Char>& parse_context() { return parse_ctx_; }
++  basic_format_parse_context<Char>& parse_context() { return parse_ctx_; }
+ 
+   FMT_CONSTEXPR void on_error(const char* message) {
+     parse_ctx_.on_error(message);
+-- 
+2.21.0 (Apple Git-122.2)
+

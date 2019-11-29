@@ -1,0 +1,25 @@
+From 2ed412fa38d48793def65e54b7926c56616154f6 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 6 Sep 2019 13:03:14 -0700
+Subject: [PATCH 030/186] Update README.rst
+
+---
+ README.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.rst b/README.rst
+index 45c3b990..960059de 100644
+--- a/README.rst
++++ b/README.rst
+@@ -345,7 +345,7 @@ Projects using this library
+ * `TrinityCore <https://github.com/TrinityCore/TrinityCore>`_: Open-source
+   MMORPG framework
+ 
+-`More... <https://github.com/search?q=cppformat&type=Code>`_
++`More... <https://github.com/search?q=fmtlib&type=Code>`_
+ 
+ If you are aware of other projects using this library, please let me know
+ by `email <mailto:victor.zverovich@gmail.com>`_ or by submitting an
+-- 
+2.21.0 (Apple Git-122.2)
+

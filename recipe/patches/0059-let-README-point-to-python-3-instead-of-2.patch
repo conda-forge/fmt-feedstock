@@ -1,0 +1,25 @@
+From d2c9276fcd28cf976d9dcd58ddca362b7ff2f92c Mon Sep 17 00:00:00 2001
+From: Paul Dreik <github@pauldreik.se>
+Date: Sun, 29 Sep 2019 08:55:09 +0200
+Subject: [PATCH 059/186] let README point to python 3 instead of 2
+
+---
+ README.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.rst b/README.rst
+index 06bbfd26..b017c3e9 100644
+--- a/README.rst
++++ b/README.rst
+@@ -28,7 +28,7 @@ Features
+ * Replacement-based `format API <https://fmt.dev/dev/api.html>`_ with
+   positional arguments for localization.
+ * `Format string syntax <https://fmt.dev/dev/syntax.html>`_ similar to the one
+-  of `str.format <https://docs.python.org/2/library/stdtypes.html#str.format>`_
++  of `str.format <https://docs.python.org/3/library/stdtypes.html#str.format>`_
+   in Python.
+ * Safe `printf implementation
+   <https://fmt.dev/latest/api.html#printf-formatting>`_ including
+-- 
+2.21.0 (Apple Git-122.2)
+

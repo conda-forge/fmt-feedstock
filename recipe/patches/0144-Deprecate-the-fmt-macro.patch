@@ -1,0 +1,109 @@
+From 57b6f2966d6993763c3197806a98a20b9524013e Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Tue, 19 Nov 2019 10:20:31 -0800
+Subject: [PATCH 144/186] Deprecate the fmt macro
+
+---
+ doc/api.rst          |  3 +--
+ include/fmt/format.h | 29 +++++++++--------------------
+ test/ostream-test.cc |  4 ++--
+ 3 files changed, 12 insertions(+), 24 deletions(-)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index 10b93483..e4d4f2d0 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -17,7 +17,7 @@ The {fmt} library API consists of the following parts:
+ * :ref:`fmt/printf.h <printf-api>`: ``printf`` formatting
+ 
+ All functions and types provided by the library reside in namespace ``fmt`` and
+-macros have prefix ``FMT_`` or ``fmt``.
++macros have prefix ``FMT_``.
+ 
+ .. _core-api:
+ 
+@@ -98,7 +98,6 @@ Compile-time Format String Checks
+ ---------------------------------
+ 
+ .. doxygendefine:: FMT_STRING
+-.. doxygendefine:: fmt
+ 
+ Formatting User-defined Types
+ -----------------------------
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index e420d9af..efdb211b 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -3602,22 +3602,13 @@ FMT_CONSTEXPR internal::udl_arg<wchar_t> operator"" _a(const wchar_t* s,
+ #endif  // FMT_USE_USER_DEFINED_LITERALS
+ FMT_END_NAMESPACE
+ 
+-/**
+-  \rst
+-  Constructs a compile-time format string.
+-
+-  **Example**::
+-
+-    // A compile-time error because 'd' is an invalid specifier for strings.
+-    std::string s = format(FMT_STRING("{:d}"), "foo");
+-  \endrst
+- */
+-#define FMT_STRING(s)                                                    \
++#define FMT_STRING_IMPL(s, ...)                                          \
+   [] {                                                                   \
+     struct str : fmt::compile_string {                                   \
+       using char_type = typename std::remove_cv<std::remove_pointer<     \
+           typename std::decay<decltype(s)>::type>::type>::type;          \
+-      FMT_CONSTEXPR operator fmt::basic_string_view<char_type>() const { \
++      __VA_ARGS__ FMT_CONSTEXPR \
++        operator fmt::basic_string_view<char_type>() const { \
+         return {s, sizeof(s) / sizeof(char_type) - 1};                   \
+       }                                                                  \
+     } result;                                                            \
+@@ -3627,22 +3618,20 @@ FMT_END_NAMESPACE
+     return result;                                                       \
+   }()
+ 
+-#if defined(FMT_STRING_ALIAS) && FMT_STRING_ALIAS
+ /**
+   \rst
+-  Constructs a compile-time format string. This macro is disabled by default to
+-  prevent potential name collisions. To enable it define ``FMT_STRING_ALIAS`` to
+-  1 before including ``fmt/format.h``.
++  Constructs a compile-time format string.
+ 
+   **Example**::
+ 
+-    #define FMT_STRING_ALIAS 1
+-    #include <fmt/format.h>
+     // A compile-time error because 'd' is an invalid specifier for strings.
+-    std::string s = format(fmt("{:d}"), "foo");
++    std::string s = format(FMT_STRING("{:d}"), "foo");
+   \endrst
+  */
+-#  define fmt(s) FMT_STRING(s)
++#define FMT_STRING(s) FMT_STRING_IMPL(s, )
++
++#if defined(FMT_STRING_ALIAS) && FMT_STRING_ALIAS
++#  define fmt(s) FMT_STRING_IMPL(s, [[deprecated]])
+ #endif
+ 
+ #ifdef FMT_HEADER_ONLY
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index 7be783d5..c0ed43d8 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -187,8 +187,8 @@ TEST(OStreamTest, Join) {
+ 
+ #if FMT_USE_CONSTEXPR
+ TEST(OStreamTest, ConstexprString) {
+-  EXPECT_EQ("42", format(fmt("{}"), std::string("42")));
+-  EXPECT_EQ("a string", format(fmt("{0}"), TestString("a string")));
++  EXPECT_EQ("42", format(FMT_STRING("{}"), std::string("42")));
++  EXPECT_EQ("a string", format(FMT_STRING("{0}"), TestString("a string")));
+ }
+ #endif
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

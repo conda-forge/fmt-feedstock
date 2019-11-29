@@ -1,0 +1,207 @@
+From 3f75e2b69eaf6bdb5a2ce99bc820b0c57dda5b4d Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 28 Aug 2019 06:18:34 -0700
+Subject: [PATCH 004/186] Make buffer_range public and update custom formatting
+ docs (#1281)
+
+---
+ doc/api.rst                   | 12 ++++++------
+ include/fmt/compile.h         |  2 +-
+ include/fmt/format.h          | 24 ++++++++++++------------
+ include/fmt/printf.h          |  3 +--
+ test/custom-formatter-test.cc |  4 ++--
+ test/format                   |  2 +-
+ test/format-test.cc           |  4 ++--
+ test/ostream-test.cc          |  2 +-
+ test/printf-test.cc           |  3 +--
+ 9 files changed, 27 insertions(+), 29 deletions(-)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index b5adf4b3..dad51f33 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -278,21 +278,21 @@ Custom Formatting of Built-in Types
+ It is possible to change the way arguments are formatted by providing a
+ custom argument formatter class::
+ 
+-  using arg_formatter =
+-    fmt::arg_formatter<fmt::back_insert_range<fmt::internal::buffer>>;
++  using arg_formatter = fmt::arg_formatter<fmt::buffer_range<char>>;
+ 
+   // A custom argument formatter that formats negative integers as unsigned
+   // with the ``x`` format specifier.
+   class custom_arg_formatter : public arg_formatter {
+    public:
+-    custom_arg_formatter(fmt::format_context &ctx,
+-                         fmt::format_specs *spec = nullptr)
+-      : arg_formatter(ctx, spec) {}
++    custom_arg_formatter(fmt::format_context& ctx,
++                         fmt::format_parse_context* parse_ctx = nullptr,
++                         fmt::format_specs* spec = nullptr)
++      : arg_formatter(ctx, parse_ctx, spec) {}
+ 
+     using arg_formatter::operator();
+ 
+     auto operator()(int value) {
+-      if (spec().type() == 'x')
++      if (specs() && specs()->type == 'x')
+         return (*this)(static_cast<unsigned>(value)); // convert to unsigned and format
+       return arg_formatter::operator()(value);
+     }
+diff --git a/include/fmt/compile.h b/include/fmt/compile.h
+index 82625bbc..082b0762 100644
+--- a/include/fmt/compile.h
++++ b/include/fmt/compile.h
+@@ -426,7 +426,7 @@ template <typename CompiledFormat, typename... Args,
+           typename Char = typename CompiledFormat::char_type>
+ std::basic_string<Char> format(const CompiledFormat& cf, const Args&... args) {
+   basic_memory_buffer<Char> buffer;
+-  using range = internal::buffer_range<Char>;
++  using range = buffer_range<Char>;
+   using context = buffer_context<Char>;
+   cf.template vformat_to<range, context>(range(buffer),
+                                          {make_format_args<context>(args...)});
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 6762e6bc..08cf38dd 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -413,17 +413,6 @@ class output_range {
+   sentinel end() const { return {}; }  // Sentinel is not used yet.
+ };
+ 
+-// A range with an iterator appending to a buffer.
+-template <typename T>
+-class buffer_range
+-    : public output_range<std::back_insert_iterator<buffer<T>>, T> {
+- public:
+-  using iterator = std::back_insert_iterator<buffer<T>>;
+-  using output_range<iterator, T>::output_range;
+-  buffer_range(buffer<T>& buf)
+-      : output_range<iterator, T>(std::back_inserter(buf)) {}
+-};
+-
+ template <typename Char>
+ inline size_t count_code_points(basic_string_view<Char> s) {
+   return s.size();
+@@ -478,6 +467,17 @@ void buffer<T>::append(const U* begin, const U* end) {
+ }
+ }  // namespace internal
+ 
++// A range with an iterator appending to a buffer.
++template <typename T>
++class buffer_range : public internal::output_range<
++                         std::back_insert_iterator<internal::buffer<T>>, T> {
++ public:
++  using iterator = std::back_insert_iterator<internal::buffer<T>>;
++  using internal::output_range<iterator, T>::output_range;
++  buffer_range(internal::buffer<T>& buf)
++      : internal::output_range<iterator, T>(std::back_inserter(buf)) {}
++};
++
+ // A UTF-8 string view.
+ class u8string_view : public basic_string_view<char8_t> {
+  public:
+@@ -2598,7 +2598,7 @@ template <typename Range>
+ using basic_writer FMT_DEPRECATED_ALIAS = internal::basic_writer<Range>;
+ using writer FMT_DEPRECATED_ALIAS = internal::writer;
+ using wwriter FMT_DEPRECATED_ALIAS =
+-    internal::basic_writer<internal::buffer_range<wchar_t>>;
++    internal::basic_writer<buffer_range<wchar_t>>;
+ 
+ /** The default argument formatter. */
+ template <typename Range>
+diff --git a/include/fmt/printf.h b/include/fmt/printf.h
+index c803aa95..a0c2d14a 100644
+--- a/include/fmt/printf.h
++++ b/include/fmt/printf.h
+@@ -368,8 +368,7 @@ template <typename OutputIt, typename Char> class basic_printf_context {
+   }
+ 
+   /** Formats stored arguments and writes the output to the range. */
+-  template <typename ArgFormatter =
+-                printf_arg_formatter<internal::buffer_range<Char>>>
++  template <typename ArgFormatter = printf_arg_formatter<buffer_range<Char>>>
+   OutputIt format();
+ };
+ 
+diff --git a/test/custom-formatter-test.cc b/test/custom-formatter-test.cc
+index db1e199c..36007cae 100644
+--- a/test/custom-formatter-test.cc
++++ b/test/custom-formatter-test.cc
+@@ -18,9 +18,9 @@
+ // A custom argument formatter that doesn't print `-` for floating-point values
+ // rounded to 0.
+ class custom_arg_formatter
+-    : public fmt::arg_formatter<fmt::internal::buffer_range<char>> {
++    : public fmt::arg_formatter<fmt::buffer_range<char>> {
+  public:
+-  using range = fmt::internal::buffer_range<char>;
++  using range = fmt::buffer_range<char>;
+   typedef fmt::arg_formatter<range> base;
+ 
+   custom_arg_formatter(fmt::format_context& ctx,
+diff --git a/test/format b/test/format
+index d9472f92..f775022f 100644
+--- a/test/format
++++ b/test/format
+@@ -718,7 +718,7 @@ template<class... Args>
+ string vformat(string_view fmt, format_args args) {
+   fmt::memory_buffer mbuf;
+   fmt::internal::buffer<char>& buf = mbuf;
+-  using range = fmt::internal::buffer_range<char>;
++  using range = fmt::buffer_range<char>;
+   detail::format_handler<detail::arg_formatter<range>, char, format_context>
+     h(range(std::back_inserter(buf)), fmt, args, {});
+   fmt::internal::parse_format_string<false>(fmt::to_string_view(fmt), h);
+diff --git a/test/format-test.cc b/test/format-test.cc
+index dfc265fc..ffa0a9b2 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -99,7 +99,7 @@ void std_format(long double value, std::wstring& result) {
+ template <typename Char, typename T>
+ ::testing::AssertionResult check_write(const T& value, const char* type) {
+   fmt::basic_memory_buffer<Char> buffer;
+-  using range = fmt::internal::buffer_range<Char>;
++  using range = fmt::buffer_range<Char>;
+   basic_writer<range> writer(buffer);
+   writer.write(value);
+   std::basic_string<Char> actual = to_string(buffer);
+@@ -1911,7 +1911,7 @@ enum TestFixedEnum : short { B };
+ TEST(FormatTest, FixedEnum) { EXPECT_EQ("0", fmt::format("{}", B)); }
+ #endif
+ 
+-using buffer_range = fmt::internal::buffer_range<char>;
++using buffer_range = fmt::buffer_range<char>;
+ 
+ class mock_arg_formatter
+     : public fmt::internal::arg_formatter_base<buffer_range> {
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index fb88ad41..8c2e814a 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -64,7 +64,7 @@ TEST(OStreamTest, Enum) {
+   EXPECT_EQ(L"0", fmt::format(L"{}", unstreamable_enum()));
+ }
+ 
+-using range = fmt::internal::buffer_range<char>;
++using range = fmt::buffer_range<char>;
+ 
+ struct test_arg_formatter : fmt::arg_formatter<range> {
+   fmt::format_parse_context parse_ctx;
+diff --git a/test/printf-test.cc b/test/printf-test.cc
+index aa25a592..47a07692 100644
+--- a/test/printf-test.cc
++++ b/test/printf-test.cc
+@@ -561,8 +561,7 @@ TEST(PrintfTest, VSPrintfMakeWArgsExample) {
+ #endif
+ }
+ 
+-typedef fmt::printf_arg_formatter<fmt::internal::buffer_range<char>>
+-    formatter_t;
++typedef fmt::printf_arg_formatter<fmt::buffer_range<char>> formatter_t;
+ typedef fmt::basic_printf_context<formatter_t::iterator, char> context_t;
+ 
+ // A custom printf argument formatter that doesn't print `-` for floating-point
+-- 
+2.21.0 (Apple Git-122.2)
+

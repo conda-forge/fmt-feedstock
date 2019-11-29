@@ -1,0 +1,31 @@
+From 78842ce0d6a445c7be8cb48fe867a0d3c7cbf11a Mon Sep 17 00:00:00 2001
+From: Leon Klingele <git@leonklingele.de>
+Date: Tue, 19 Nov 2019 15:13:38 +0100
+Subject: [PATCH 142/186] test: add default constructor for a const value
+
+This fixed a compilation error of the OS X 10.11.6 C++ compiler:
+
+    ./fmt/test/format-test.cc:1861:16: error: default initialization of an object of const type 'const Answer' without a user-provided default constructor
+      const Answer const_answer;
+                   ^
+                               {}
+---
+ test/format-test.cc | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 66d87c2d..08828ccb 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1917,7 +1917,7 @@ TEST(FormatTest, CustomFormatCompileTimeString) {
+   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), Answer()));
+   Answer answer;
+   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), answer));
+-  const Answer const_answer;
++  const Answer const_answer = Answer();
+   EXPECT_EQ("42", fmt::format(FMT_STRING("{}"), const_answer));
+ }
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

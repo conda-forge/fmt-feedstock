@@ -1,0 +1,60 @@
+From 28d7191c277eb679c0e7d6469de36755087afc3b Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 24 Nov 2019 08:22:18 -0800
+Subject: [PATCH 163/186] Don't print trailing zero with fixed, precision=0,
+ and showpoint (#1417)
+
+---
+ include/fmt/format.h | 14 +++++++++-----
+ test/format-test.cc  |  1 +
+ 2 files changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 8f2e8e8a..ffb4dcc3 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1136,9 +1136,14 @@ template <typename Char> class float_writer {
+       // 1234e7 -> 12340000000[.0+]
+       it = copy_str<Char>(digits_, digits_ + num_digits_, it);
+       it = std::fill_n(it, full_exp - num_digits_, static_cast<Char>('0'));
+-      int num_zeros = (std::max)(params_.num_digits - full_exp, 1);
+       if (params_.trailing_zeros) {
+         *it++ = decimal_point_;
++        int num_zeros = params_.num_digits - full_exp;
++        if (num_zeros <= 0) {
++          if (params_.format != float_format::fixed)
++            *it++ = static_cast<Char>('0');
++          return it;
++        }
+ #ifdef FUZZING_BUILD_MODE_UNSAFE_FOR_PRODUCTION
+         if (num_zeros > 1000)
+           throw std::runtime_error("fuzz mode - avoiding excessive cpu use");
+@@ -1191,10 +1196,9 @@ template <typename Char> class float_writer {
+         decimal_point_(decimal_point) {
+     int full_exp = num_digits + exp - 1;
+     int precision = params.num_digits > 0 ? params.num_digits : 16;
+-    if (params_.format == float_format::general) {
+-      params_.format = full_exp >= -4 && full_exp < precision
+-                           ? float_format::fixed
+-                           : float_format::exp;
++    if (params_.format == float_format::general &&
++        !(full_exp >= -4 && full_exp < precision)) {
++      params_.format = float_format::exp;
+     }
+     size_ = prettify(counting_iterator()).count();
+     size_ += params_.sign ? 1 : 0;
+diff --git a/test/format-test.cc b/test/format-test.cc
+index e6095841..bce5539f 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1212,6 +1212,7 @@ TEST(FormatterTest, Precision) {
+       "012970999954193198940908041656332452475714786901472678015935523861155013"
+       "480352649347201937902681071074917033322268447533357208324319361e-324",
+       format("{:.494}", 4.9406564584124654E-324));
++  EXPECT_EQ("123.", format("{:#.0f}", 123.0));
+ 
+   EXPECT_THROW_MSG(format("{0:.2}", reinterpret_cast<void*>(0xcafe)),
+                    format_error,
+-- 
+2.21.0 (Apple Git-122.2)
+

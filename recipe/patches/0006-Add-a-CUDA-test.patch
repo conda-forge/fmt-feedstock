@@ -1,0 +1,189 @@
+From 345ba07f1d370fa8f5d1d64c42f6cc20cf13fafe Mon Sep 17 00:00:00 2001
+From: luncliff <luncliff@gmail.com>
+Date: Wed, 28 Aug 2019 09:58:37 +0000
+Subject: [PATCH 006/186] Add a CUDA test
+
+test cuda: import fmt in CUDA source code
+
+Current test is only for Windows(cl.exe).
+Need to test more with the other host compilers...
+
+* Activate the test when `find_package(CUDA)` worked
+* The test runs with C++14
+
+Detailed comments in 'test/cuda-test'
+
+test cuda: add more comment / macro check
+
+* checks both `__NVCC__` and `__CUDACC__`
+
+More comments for CMake and CUDA source file.
+
+test cuda: <fmt/core.h> checks NVCC and CUDA
+
+The header file checks 2 things.
+
+* __NVCC__: if the compiler is from NVIDIA
+* __CUDACC__: if the source code is CUDA(.cu) file
+
+Since we can't sure all users prefer latest, Version for
+`find_pacakge(CUDA)` is downgraded to 9.0.
+This is the minimum version for C++14 in CUDA
+---
+ include/fmt/core.h            |  5 ++--
+ test/CMakeLists.txt           |  8 +++++
+ test/cuda-test/CMakeLists.txt | 55 +++++++++++++++++++++++++++++++++++
+ test/cuda-test/cpp14.cc       | 11 +++++++
+ test/cuda-test/cuda-cpp14.cu  | 28 ++++++++++++++++++
+ 5 files changed, 105 insertions(+), 2 deletions(-)
+ create mode 100644 test/cuda-test/CMakeLists.txt
+ create mode 100644 test/cuda-test/cpp14.cc
+ create mode 100644 test/cuda-test/cuda-cpp14.cu
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 2dc6ed55..7f7682be 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -132,8 +132,9 @@
+ #    endif
+ #  endif
+ #endif
+-// Workaround broken [[deprecated]] in the Intel compiler.
+-#ifdef __INTEL_COMPILER
++
++// Workaround broken [[deprecated]] in the Intel compiler and NVCC.
++#if defined(__INTEL_COMPILER) || defined(__NVCC__) || defined(__CUDACC__)
+ #  define FMT_DEPRECATED_ALIAS
+ #else
+ #  define FMT_DEPRECATED_ALIAS FMT_DEPRECATED
+diff --git a/test/CMakeLists.txt b/test/CMakeLists.txt
+index e399096f..968f4461 100644
+--- a/test/CMakeLists.txt
++++ b/test/CMakeLists.txt
+@@ -225,3 +225,11 @@ if (FMT_PEDANTIC AND NOT WIN32)
+     "-DPEDANTIC_COMPILE_FLAGS=${PEDANTIC_COMPILE_FLAGS}"
+     "-DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}")
+ endif ()
++
++# Activate optional CUDA tests if CUDA is found. For version selection, see
++# https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#cpp14-language-features
++find_package(CUDA 9.0)
++if (CUDA_FOUND)
++  add_subdirectory(cuda-test)
++  add_test(NAME cuda-test COMMAND fmt-in-cuda-test)
++endif ()
+diff --git a/test/cuda-test/CMakeLists.txt b/test/cuda-test/CMakeLists.txt
+new file mode 100644
+index 00000000..6fa00c0d
+--- /dev/null
++++ b/test/cuda-test/CMakeLists.txt
+@@ -0,0 +1,55 @@
++# We can find some usecases which follow the guide of CMake which uses
++# `enable_language(CUDA)` instead of `find_package(CUDA)` and let the CMake
++# built-in functions use NVCC.
++
++# See: https://cmake.org/cmake/help/latest/module/FindCUDA.html#replacement
++#
++# However, this requires CMake version 3.10 or higher and we can't be sure most
++# of the CUDA projects are using those.
++#
++# This test relies on `find_package(CUDA)` in the parent CMake config.
++
++# These can be updated when NVCC becomes ready for C++ 17 features
++# https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#cpp14-language-features
++set(CMAKE_CUDA_STANDARD 14)
++set(CMAKE_CUDA_STANDARD_REQUIRED 14)
++
++# https://docs.nvidia.com/cuda/cuda-compiler-driver-nvcc/index.html
++list(APPEND CUDA_NVCC_FLAGS "-std=c++14")
++if (MSVC)
++  # This is the solution of pytorch:
++  # https://github.com/pytorch/pytorch/pull/7118
++  list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "/std:c++14")
++  list(APPEND CUDA_NVCC_FLAGS "-Xcompiler" "/Zc:__cplusplus")
++  # for the reason of this -Xcompiler options, see below.
++endif ()
++
++# In this test, we assume that the user is going to compile CUDA source code
++# with some libraries (fmt in this case).
++#
++# In addition to that, this test invokes both the C++ host compiler and NVCC
++# by providing another (non-CUDA) C++ source code.
++cuda_add_executable(fmt-in-cuda-test cuda-cpp14.cu cpp14.cc)
++target_compile_features(fmt-in-cuda-test PRIVATE cxx_std_14)
++
++get_target_property(IN_USE_CUDA_STANDARD fmt-in-cuda-test CUDA_STANDARD)
++message(STATUS "cuda_standard:          ${IN_USE_CUDA_STANDARD}")
++
++get_target_property(IN_USE_CUDA_STANDARD_REQUIRED
++    fmt-in-cuda-test CUDA_STANDARD_REQUIRED)
++message(STATUS "cuda_standard_required: ${IN_USE_CUDA_STANDARD_REQUIRED}")
++
++# We don't use PUBLIC or other keyword for reasons explained in the
++# CUDA_LINK_LIBRARIES_KEYWORD section in
++# https://cmake.org/cmake/help/latest/module/FindCUDA.html
++target_link_libraries(fmt-in-cuda-test fmt::fmt)
++
++if (MSVC)
++  # This part is for (non-CUDA) C++ code. MSVC can define incorrect
++  # `__cplusplus` macro. Fix for the issue is to use additional compiler flag. 
++  #
++  # See Also:
++  # https://devblogs.microsoft.com/cppblog/msvc-now-correctly-reports-__cplusplus/
++  # https://github.com/Microsoft/vscode-cpptools/issues/2595
++  target_compile_options(fmt-in-cuda-test PRIVATE /Zc:__cplusplus /permissive-)
++endif ()
+diff --git a/test/cuda-test/cpp14.cc b/test/cuda-test/cpp14.cc
+new file mode 100644
+index 00000000..ad846396
+--- /dev/null
++++ b/test/cuda-test/cpp14.cc
+@@ -0,0 +1,11 @@
++#include <fmt/core.h>
++
++// The purpose of this part is to ensure NVCC's host compiler also supports
++// the standard version. See 'cuda-cpp14.cu'.
++//
++// https://en.cppreference.com/w/cpp/preprocessor/replace#Predefined_macros
++static_assert(__cplusplus >= 201402L, "expect C++ 2014 for host compiler");
++
++auto make_message_cpp() -> std::string {
++  return fmt::format("host compiler \t: __cplusplus == {}", __cplusplus);
++}
+diff --git a/test/cuda-test/cuda-cpp14.cu b/test/cuda-test/cuda-cpp14.cu
+new file mode 100644
+index 00000000..76a9d088
+--- /dev/null
++++ b/test/cuda-test/cuda-cpp14.cu
+@@ -0,0 +1,28 @@
++//  Direct NVCC command line example:
++//
++//  nvcc ./cuda-cpp14.cu -x cu -I"../include" -l"fmtd" -L"../build/Debug" \
++//       -std=c++14 -Xcompiler /std:c++14 -Xcompiler /Zc:__cplusplus
++
++// Ensure that we are using the latest C++ standard for NVCC
++// The version is C++14
++//
++// https://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#c-cplusplus-language-support
++// https://en.cppreference.com/w/cpp/preprocessor/replace#Predefined_macros
++static_assert(__cplusplus >= 201402L, "expect C++ 2014 for nvcc");
++
++#include <fmt/core.h>
++
++#include <cuda.h>
++#include <iostream>
++
++extern auto make_message_cpp() -> std::string;
++extern auto make_message_cuda() -> std::string;
++
++int main() {
++  std::cout << make_message_cuda() << std::endl;
++  std::cout << make_message_cpp() << std::endl;
++}
++
++auto make_message_cuda() -> std::string {
++  return fmt::format("nvcc compiler \t: __cplusplus == {}", __cplusplus);
++}
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,25 @@
+From 4a1da44f9160959031c56a6480cdcb4452fc210a Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 17 Nov 2019 10:14:06 -0800
+Subject: [PATCH 134/186] Apply coding conventions to examples
+
+---
+ doc/api.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index 6050a2d1..49d6c920 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -116,7 +116,7 @@ template and implement ``parse`` and ``format`` methods::
+     char presentation = 'f';
+ 
+     // Parses format specifications of the form ['f' | 'e'].
+-    constexpr auto parse(format_parse_context &ctx) {
++    constexpr auto parse(format_parse_context& ctx) {
+       // [ctx.begin(), ctx.end()) is a character range that contains a part of
+       // the format string starting from the format specifications to be parsed,
+       // e.g. in
+-- 
+2.21.0 (Apple Git-122.2)
+

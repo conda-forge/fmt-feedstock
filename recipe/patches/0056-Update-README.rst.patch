@@ -1,0 +1,25 @@
+From 4b8f8fac96a7819f28f4be523ca10a2d5d8aaaf2 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 25 Sep 2019 07:14:45 -0700
+Subject: [PATCH 056/186] Update README.rst
+
+---
+ README.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/README.rst b/README.rst
+index 0e77990e..06bbfd26 100644
+--- a/README.rst
++++ b/README.rst
+@@ -43,7 +43,7 @@ Features
+   consists of just three header files, ``core.h``, ``format.h`` and
+   ``format-inl.h``) and compiled code. See `Compile time and code bloat`_.
+ * Reliability: the library has an extensive set of `unit tests
+-  <https://github.com/fmtlib/fmt/tree/master/test>`_.
++  <https://github.com/fmtlib/fmt/tree/master/test>`_ and is continuously fuzzed.
+ * Safety: the library is fully type safe, errors in format strings can be
+   reported at compile time, automatic memory management prevents buffer overflow
+   errors.
+-- 
+2.21.0 (Apple Git-122.2)
+

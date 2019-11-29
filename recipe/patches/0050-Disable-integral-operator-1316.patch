@@ -1,0 +1,43 @@
+From ccc8f5db021aedd57937fe72a967f9c624d22532 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 23 Sep 2019 20:34:08 -0700
+Subject: [PATCH 050/186] Disable integral operator<< (#1316)
+
+---
+ include/fmt/ostream.h | 4 ++++
+ test/ostream-test.cc  | 5 +++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/ostream.h b/include/fmt/ostream.h
+index 938d1176..18ae820c 100644
+--- a/include/fmt/ostream.h
++++ b/include/fmt/ostream.h
+@@ -49,6 +49,10 @@ template <typename Char> struct test_stream : std::basic_ostream<Char> {
+   // Hide all operator<< from std::basic_ostream<Char>.
+   void_t<> operator<<(null<>);
+   void_t<> operator<<(const Char*);
++
++  template <typename T, FMT_ENABLE_IF(std::is_convertible<T, int>::value &&
++                                      !std::is_enum<T>::value)>
++  void_t<> operator<<(T);
+ };
+ 
+ // Checks if T has a user-defined operator<< (e.g. not a member of
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index 6c2bc412..7be783d5 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -250,7 +250,8 @@ struct convertible {
+   operator T() const { return value; }
+ };
+ 
+-TEST(OStreamTest, ConvertibleToCString) {
+-  EXPECT_EQ("x", fmt::format("{}", convertible<char>('x')));
++TEST(OStreamTest, DisableBuiltinOStreamOperators) {
++  EXPECT_EQ("42", fmt::format("{:d}", convertible<unsigned short>(42)));
++  EXPECT_EQ(L"42", fmt::format(L"{:d}", convertible<unsigned short>(42)));
+   EXPECT_EQ("foo", fmt::format("{}", convertible<const char*>("foo")));
+ }
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,274 @@
+From 4cf59ce73429b8a33326b257406153ee7ce77d47 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 23 Nov 2019 06:22:30 -0800
+Subject: [PATCH 160/186] Integrate Grisu and sprintf digit generators
+
+---
+ include/fmt/format-inl.h | 49 ++++++++++++++++++++++++----------------
+ include/fmt/format.h     | 41 ++++++++++++---------------------
+ src/format.cc            | 18 +++++++--------
+ test/format-impl-test.cc |  3 +--
+ 4 files changed, 53 insertions(+), 58 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 41ec0c26..1d88ee6c 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -384,7 +384,8 @@ class fp {
+   }
+ 
+   // Assigns d to this and return true iff predecessor is closer than successor.
+-  template <typename Double> bool assign(Double d) {
++  template <typename Double, FMT_ENABLE_IF(sizeof(Double) == sizeof(uint64_t))>
++  bool assign(Double d) {
+     // Assume double is in the format [sign][exponent][significand].
+     using limits = std::numeric_limits<Double>;
+     const int exponent_size =
+@@ -406,6 +407,12 @@ class fp {
+     return is_predecessor_closer;
+   }
+ 
++  template <typename Double, FMT_ENABLE_IF(sizeof(Double) != sizeof(uint64_t))>
++  bool assign(Double) {
++    *this = fp();
++    return false;
++  }
++
+   // Assigns d to this together with computing lower and upper boundaries,
+   // where a boundary is a value half way between the number and its predecessor
+   // (lower) or successor (upper). The upper boundary is normalized and lower
+@@ -1029,28 +1036,32 @@ void fallback_format(Double d, buffer<char>& buf, int& exp10) {
+   }
+ }
+ 
+-template <typename Float, enable_if_t<(sizeof(Float) == sizeof(uint64_t)), int>>
+-bool grisu_format(Float value, int precision, buffer<char>& buf,
+-                  float_spec spec, int& exp) {
++// Formats value using the Grisu algorithm
++// (https://www.cs.tufts.edu/~nr/cs257/archive/florian-loitsch/printf.pdf)
++// if Float is a IEEE754 binary32 or binary64 and snprintf otherwise.
++template <typename T>
++int format_float(T value, int precision, float_spec spec, buffer<char>& buf) {
+   FMT_ASSERT(value >= 0, "value is negative");
++  static_assert(!std::is_same<T, float>(), "");
+ 
+   const bool fixed = spec.format == float_format::fixed;
+   if (value <= 0) {  // <= instead of == to silence a warning.
+     if (precision <= 0 || !fixed) {
+-      exp = 0;
+       buf.push_back('0');
+-    } else {
+-      exp = -precision;
+-      buf.resize(to_unsigned(precision));
+-      std::uninitialized_fill_n(buf.data(), precision, '0');
++      return 0;
+     }
+-    return true;
++    buf.resize(to_unsigned(precision));
++    std::uninitialized_fill_n(buf.data(), precision, '0');
++    return -precision;
+   }
+ 
++  if (!spec.use_grisu) return snprintf_float(value, precision, spec, buf);
++
++  int exp = 0;
+   const int min_exp = -60;  // alpha in Grisu.
+   int cached_exp10 = 0;     // K in Grisu.
+   if (precision != -1) {
+-    if (precision > 17) return false;
++    if (precision > 17) return snprintf_float(value, precision, spec, buf);
+     fp fp_value(value);
+     fp normalized = normalize(fp_value);
+     const auto cached_pow = get_cached_power(
+@@ -1058,7 +1069,7 @@ bool grisu_format(Float value, int precision, buffer<char>& buf,
+     normalized = normalized * cached_pow;
+     fixed_handler handler{buf.data(), 0, precision, -cached_exp10, fixed};
+     if (grisu_gen_digits(normalized, 1, exp, handler) == digits::error)
+-      return false;
++      return snprintf_float(value, precision, spec, buf);
+     int num_digits = handler.size;
+     if (!fixed) {
+       // Remove trailing zeros.
+@@ -1075,7 +1086,6 @@ bool grisu_format(Float value, int precision, buffer<char>& buf,
+       fp_value.assign_float_with_boundaries(value, lower, upper);
+     else
+       fp_value.assign_with_boundaries(value, lower, upper);
+-
+     // Find a cached power of 10 such that multiplying upper by it will bring
+     // the exponent in the range [min_exp, -32].
+     const auto cached_pow = get_cached_power(  // \tilde{c}_{-k} in Grisu.
+@@ -1095,19 +1105,18 @@ bool grisu_format(Float value, int precision, buffer<char>& buf,
+     if (result == digits::error) {
+       exp = exp + size - cached_exp10 - 1;
+       fallback_format(value, buf, exp);
+-      return true;
++      return exp;
+     }
+     buf.resize(to_unsigned(size));
+   }
+-  exp -= cached_exp10;
+-  return true;
++  return exp - cached_exp10;
+ }
+ 
+-template <typename Float>
+-int sprintf_format(Float value, int precision, float_spec spec,
+-                   buffer<char>& buf) {
++template <typename T>
++int snprintf_float(T value, int precision, float_spec spec, buffer<char>& buf) {
+   // Buffer capacity must be non-zero, otherwise MSVC's vsnprintf_s will fail.
+   FMT_ASSERT(buf.capacity() > buf.size(), "empty buffer");
++  static_assert(!std::is_same<T, float>(), "");
+ 
+   // Subtract 1 to account for the difference in precision since we use %e for
+   // both general and exponent format.
+@@ -1124,7 +1133,7 @@ int sprintf_format(Float value, int precision, float_spec spec,
+     *format_ptr++ = '.';
+     *format_ptr++ = '*';
+   }
+-  if (std::is_same<Float, long double>()) *format_ptr++ = 'L';
++  if (std::is_same<T, long double>()) *format_ptr++ = 'L';
+   *format_ptr++ = spec.format != float_format::hex
+                       ? (spec.format == float_format::fixed ? 'f' : 'e')
+                       : (spec.upper ? 'A' : 'a');
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 5e9e82db..8f2e8e8a 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1076,6 +1076,7 @@ struct float_spec {
+   bool percent;
+   bool alt;
+   bool binary32;
++  bool use_grisu;
+ };
+ 
+ struct gen_digits_params {
+@@ -1208,25 +1209,15 @@ template <typename Char> class float_writer {
+   }
+ };
+ 
+-// Formats value using the Grisu algorithm:
+-// https://www.cs.tufts.edu/~nr/cs257/archive/florian-loitsch/printf.pdf
+-template <typename Float, FMT_ENABLE_IF(sizeof(Float) == sizeof(uint64_t))>
+-FMT_API bool grisu_format(Float, int, buffer<char>&, float_spec, int&);
+-template <typename Float, FMT_ENABLE_IF(sizeof(Float) != sizeof(uint64_t))>
+-inline bool grisu_format(Float, int, buffer<char>&, float_spec, int&) {
+-  return false;
+-}
++template <typename T>
++int format_float(T value, int precision, float_spec spec, buffer<char>& buf);
+ 
+-template <typename Float>
+-int sprintf_format(Float value, int precision, float_spec spec,
+-                   buffer<char>& buf);
++// Formats a floating-point number with snprintf.
++template <typename T>
++int snprintf_float(T value, int precision, float_spec spec, buffer<char>& buf);
+ 
+-template <>
+-inline int sprintf_format<float>(float value, int precision, float_spec spec,
+-                                 buffer<char>& buf) {
+-  // sprintf does not support float so convert to double.
+-  return sprintf_format<double>(value, precision, spec, buf);
+-}
++template <typename T> T promote_float(T value) { return value; }
++inline double promote_float(float value) { return value; }
+ 
+ template <typename Handler>
+ FMT_CONSTEXPR void handle_int_type_spec(char spec, Handler&& handler) {
+@@ -1715,7 +1706,9 @@ template <typename Range> class basic_writer {
+       return write_padded(specs, inf_or_nan_writer<char_type>{sign, str});
+     }
+ 
+-    if (specs.align == align::numeric) {
++    if (specs.align == align::none) {
++      specs.align = align::right;
++    } else if (specs.align == align::numeric) {
+       if (sign) {
+         auto&& it = reserve(1);
+         *it++ = static_cast<char_type>(data::signs[sign]);
+@@ -1723,28 +1716,22 @@ template <typename Range> class basic_writer {
+         if (specs.width != 0) --specs.width;
+       }
+       specs.align = align::right;
+-    } else if (specs.align == align::none) {
+-      specs.align = align::right;
+     }
+ 
+     memory_buffer buffer;
+     if (fspec.format == float_format::hex) {
+       if (sign) buffer.push_back(data::signs[sign]);
+       fspec.alt = specs.alt;
+-      sprintf_format(value, specs.precision, fspec, buffer);
++      snprintf_float(promote_float(value), specs.precision, fspec, buffer);
+       write_padded(specs, str_writer<char>{buffer.data(), buffer.size()});
+       return;
+     }
+     int precision = specs.precision >= 0 || !specs.type ? specs.precision : 6;
+     if (fspec.format == float_format::exp) ++precision;
+     if (const_check(std::is_same<T, float>())) fspec.binary32 = true;
++    fspec.use_grisu = use_grisu<T>();
+     if (const_check(FMT_DEPRECATED_PERCENT) && fspec.percent) value *= 100;
+-    int exp = 0;
+-    bool use_grisu =
+-        internal::use_grisu<T>() &&
+-        grisu_format(static_cast<double>(value), precision, buffer, fspec, exp);
+-    if (!use_grisu) exp = sprintf_format(value, precision, fspec, buffer);
+-
++    int exp = format_float(promote_float(value), precision, fspec, buffer);
+     if (const_check(FMT_DEPRECATED_PERCENT) && fspec.percent) {
+       buffer.push_back('%');
+       --exp;  // Adjust decimal place position.
+diff --git a/src/format.cc b/src/format.cc
+index cdd90f4e..5ac652df 100644
+--- a/src/format.cc
++++ b/src/format.cc
+@@ -10,10 +10,10 @@
+ FMT_BEGIN_NAMESPACE
+ template struct FMT_API internal::basic_data<void>;
+ 
+-// Workaround a bug in MSVC2013 that prevents instantiation of grisu_format.
+-bool (*instantiate_grisu_format)(double, int, internal::buffer<char>&,
+-                                 internal::float_spec,
+-                                 int&) = internal::grisu_format;
++// Workaround a bug in MSVC2013 that prevents instantiation of format_float.
++int (*instantiate_format_float)(double, int, internal::float_spec,
++                                internal::buffer<char>&) =
++    internal::format_float;
+ 
+ #ifndef FMT_STATIC_THOUSANDS_SEPARATOR
+ template FMT_API internal::locale_ref::locale_ref(const std::locale& loc);
+@@ -37,11 +37,11 @@ template FMT_API std::string internal::vformat<char>(
+ template FMT_API format_context::iterator internal::vformat_to(
+     internal::buffer<char>&, string_view, basic_format_args<format_context>);
+ 
+-template FMT_API int internal::sprintf_format(double, int, internal::float_spec,
+-                                              internal::buffer<char>&);
+-template FMT_API int internal::sprintf_format(long double, int,
+-                                              internal::float_spec,
+-                                              internal::buffer<char>&);
++template FMT_API int internal::format_float(double, int, internal::float_spec,
++                                            internal::buffer<char>&);
++template FMT_API int internal::format_float(long double, int,
++                                            internal::float_spec,
++                                            internal::buffer<char>&);
+ 
+ // Explicit instantiations for wchar_t.
+ 
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index 1e3a0b9d..b192be90 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -326,8 +326,7 @@ TEST(FPTest, FixedHandler) {
+ 
+ TEST(FPTest, GrisuFormatCompilesWithNonIEEEDouble) {
+   fmt::memory_buffer buf;
+-  int exp = 0;
+-  grisu_format(4.2f, -1, buf, fmt::internal::float_spec(), exp);
++  format_float(0.42, -1, fmt::internal::float_spec(), buf);
+ }
+ 
+ template <typename T> struct value_extractor {
+-- 
+2.21.0 (Apple Git-122.2)
+

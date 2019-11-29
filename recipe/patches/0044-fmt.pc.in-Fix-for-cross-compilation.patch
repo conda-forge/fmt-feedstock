@@ -1,0 +1,30 @@
+From 79c923ba2c6e6c95c806a0b1fa4c0e78e7aa1e02 Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Mon, 16 Sep 2019 11:24:09 -0700
+Subject: [PATCH 044/186] fmt.pc.in: Fix for cross compilation
+
+These variables get set to /usr/lib and /usr/include , which is totally wrong in a cross compilation
+environment.
+
+Changed to standard pkgconfig values consistent with most other ones.
+---
+ support/cmake/fmt.pc.in | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/support/cmake/fmt.pc.in b/support/cmake/fmt.pc.in
+index 79de0b6d..e935dc78 100644
+--- a/support/cmake/fmt.pc.in
++++ b/support/cmake/fmt.pc.in
+@@ -1,7 +1,7 @@
+ prefix=@CMAKE_INSTALL_PREFIX@
+ exec_prefix=@CMAKE_INSTALL_PREFIX@
+-libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+-includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
++libdir=${exec_prefix}/@CMAKE_INSTALL_LIBDIR@
++includedir=${prefix}/@CMAKE_INSTALL_INCLUDEDIR@
+ 
+ Name: fmt
+ Description: A modern formatting library
+-- 
+2.21.0 (Apple Git-122.2)
+

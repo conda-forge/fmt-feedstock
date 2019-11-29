@@ -1,0 +1,49 @@
+From 0656045d0239f9e550cfc7e138559973e7ca8b95 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 8 Sep 2019 18:41:02 -0700
+Subject: [PATCH 041/186] Fix format overload that takes text_style (#1305)
+
+---
+ include/fmt/color.h | 5 +++--
+ test/color-test.cc  | 4 +++-
+ 2 files changed, 6 insertions(+), 3 deletions(-)
+
+diff --git a/include/fmt/color.h b/include/fmt/color.h
+index d9d31559..f2dd24f2 100644
+--- a/include/fmt/color.h
++++ b/include/fmt/color.h
+@@ -576,8 +576,9 @@ inline std::basic_string<Char> vformat(
+ template <typename S, typename... Args, typename Char = char_t<S> >
+ inline std::basic_string<Char> format(const text_style& ts, const S& format_str,
+                                       const Args&... args) {
+-  return internal::vformat(ts, to_string_view(format_str),
+-                           {internal::make_args_checked(format_str, args...)});
++  return internal::vformat(
++      ts, to_string_view(format_str),
++      {internal::make_args_checked<Args...>(format_str, args...)});
+ }
+ 
+ FMT_END_NAMESPACE
+diff --git a/test/color-test.cc b/test/color-test.cc
+index 62cfca0d..fde3a0c5 100644
+--- a/test/color-test.cc
++++ b/test/color-test.cc
+@@ -47,7 +47,7 @@ TEST(ColorsTest, ColorsPrint) {
+                "\x1b[105mtbmagenta\x1b[0m");
+ }
+ 
+-TEST(ColorsTest, ColorsFormat) {
++TEST(ColorsTest, Format) {
+   EXPECT_EQ(fmt::format(fg(fmt::rgb(255, 20, 30)), "rgb(255,20,30)"),
+             "\x1b[38;2;255;020;030mrgb(255,20,30)\x1b[0m");
+   EXPECT_EQ(fmt::format(fg(fmt::color::blue), "blue"),
+@@ -78,4 +78,6 @@ TEST(ColorsTest, ColorsFormat) {
+             "\x1b[92mtbgreen\x1b[0m");
+   EXPECT_EQ(fmt::format(bg(fmt::terminal_color::bright_magenta), "tbmagenta"),
+             "\x1b[105mtbmagenta\x1b[0m");
++  EXPECT_EQ(fmt::format(fg(fmt::terminal_color::red), "{}", "foo"),
++            "\x1b[31mfoo\x1b[0m");
+ }
+-- 
+2.21.0 (Apple Git-122.2)
+

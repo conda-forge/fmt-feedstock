@@ -1,0 +1,24 @@
+From 5bb7b28e1525c96ed0c8be954099197ef2dd9e52 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Tue, 5 Nov 2019 10:43:18 +0000
+Subject: [PATCH 111/186] Document members
+
+---
+ doc/api.rst | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index 2499096a..e16e9860 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -183,6 +183,7 @@ You can also write a formatter for a hierarchy of classes::
+   }
+ 
+ .. doxygenclass: fmt::basic_format_parse_context
++   :members:
+ 
+ Output Iterator Support
+ -----------------------
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,105 @@
+From bb205d940d8929d086eadb59705349dbdaa1a274 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 29 Nov 2019 05:15:59 -0800
+Subject: [PATCH 185/186] Fix fallback pointer formatting on big endian
+
+---
+ include/fmt/format-inl.h |  2 +-
+ include/fmt/format.h     | 40 ++++++++++++++++++++++++++++------------
+ test/format-impl-test.cc |  2 +-
+ 3 files changed, 30 insertions(+), 14 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index 646e328f..6d45df7f 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -239,7 +239,7 @@ FMT_FUNC void system_error::init(int err_code, string_view format_str,
+ namespace internal {
+ 
+ template <> FMT_FUNC int count_digits<4>(internal::fallback_uintptr n) {
+-  // Assume little endian; pointer formatting is implementation-defined anyway.
++  // fallback_uintptr is always stored in little endian.
+   int i = static_cast<int>(sizeof(void*)) - 1;
+   while (i > 0 && n.value[i] == 0) --i;
+   auto char_digits = std::numeric_limits<unsigned char>::digits / 4;
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index e57b2b2c..5a9ac298 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -207,17 +207,7 @@ namespace internal {
+ // warnings.
+ template <typename T> inline T const_check(T value) { return value; }
+ 
+-// A fallback implementation of uintptr_t for systems that lack it.
+-struct fallback_uintptr {
+-  unsigned char value[sizeof(void*)];
+-};
+-#ifdef UINTPTR_MAX
+-using uintptr_t = ::uintptr_t;
+-#else
+-using uintptr_t = fallback_uintptr;
+-#endif
+-
+-// An equivalent of `*reinterpret_cast<Dest*>(&source)` that doesn't produce
++// An equivalent of `*reinterpret_cast<Dest*>(&source)` that doesn't have
+ // undefined behavior (e.g. due to type aliasing).
+ // Example: uint64_t d = bit_cast<uint64_t>(2.718);
+ template <typename Dest, typename Source>
+@@ -228,6 +218,32 @@ inline Dest bit_cast(const Source& source) {
+   return dest;
+ }
+ 
++inline bool is_big_endian() {
++  auto u = 1u;
++  struct bytes { char data[sizeof(u)]; };
++  return bit_cast<bytes>(u).data[0] == 0;
++}
++
++// A fallback implementation of uintptr_t for systems that lack it.
++struct fallback_uintptr {
++  unsigned char value[sizeof(void*)];
++
++  fallback_uintptr() = default;
++  explicit fallback_uintptr(const void* p) {
++    *this = bit_cast<fallback_uintptr>(p);
++    if (is_big_endian()) std::memmove(value, value, sizeof(void*));
++  }
++};
++#ifdef UINTPTR_MAX
++using uintptr_t = ::uintptr_t;
++inline uintptr_t to_uintptr(const void* p) { return bit_cast<uintptr_t>(p); }
++#else
++using uintptr_t = fallback_uintptr;
++inline fallback_uintptr to_uintptr(const void* p) {
++  return fallback_uintptr(p);
++}
++#endif
++
+ // Returns the largest possible value for type T. Same as
+ // std::numeric_limits<T>::max() but shorter and not affected by the max macro.
+ template <typename T> constexpr T max_value() {
+@@ -1829,7 +1845,7 @@ class arg_formatter_base {
+   }
+ 
+   void write_pointer(const void* p) {
+-    writer_.write_pointer(internal::bit_cast<internal::uintptr_t>(p), specs_);
++    writer_.write_pointer(internal::to_uintptr(p), specs_);
+   }
+ 
+  protected:
+diff --git a/test/format-impl-test.cc b/test/format-impl-test.cc
+index cdba7699..3c944382 100644
+--- a/test/format-impl-test.cc
++++ b/test/format-impl-test.cc
+@@ -447,7 +447,7 @@ TEST(UtilTest, CountDigits) {
+ TEST(UtilTest, WriteUIntPtr) {
+   fmt::memory_buffer buf;
+   fmt::internal::writer writer(buf);
+-  writer.write_pointer(fmt::internal::bit_cast<fmt::internal::fallback_uintptr>(
++  writer.write_pointer(fmt::internal::fallback_uintptr(
+                            reinterpret_cast<void*>(0xface)),
+                        nullptr);
+   EXPECT_EQ("0xface", to_string(buf));
+-- 
+2.21.0 (Apple Git-122.2)
+

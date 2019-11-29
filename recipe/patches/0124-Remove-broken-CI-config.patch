@@ -1,0 +1,62 @@
+From 52ae134f8441a34b57e30159dd5a6eee2e84b596 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Thu, 14 Nov 2019 07:06:38 -0800
+Subject: [PATCH 124/186] Remove broken CI config
+
+---
+ .travis.yml | 39 ---------------------------------------
+ 1 file changed, 39 deletions(-)
+
+diff --git a/.travis.yml b/.travis.yml
+index 816d14fb..ff9d167b 100644
+--- a/.travis.yml
++++ b/.travis.yml
+@@ -92,45 +92,6 @@ matrix:
+       # g++ 4.8 on Linux with C++11
+     - env: COMPILER=g++-4.8 BUILD=Debug STANDARD=11
+       compiler: gcc
+-    - name: Android NDK (Gradle)
+-      language: android
+-      addons:
+-        apt:
+-          update: true
+-          sources:
+-            - ubuntu-toolchain-r-test
+-          packages:
+-            - ninja-build
+-            - curl
+-            - tree
+-      android:
+-        components:
+-          - tools
+-          - platform-tools
+-          - android-25 # 7.0
+-          - android-27 # 8.1
+-          - android-28 # 9.0
+-          - build-tools-28.0.3
+-      before_install:
+-        # Install Gradle from https://sdkman.io/
+-        - curl -s "https://get.sdkman.io" | bash > /dev/null
+-        - source "$HOME/.sdkman/bin/sdkman-init.sh"
+-        - sdk version
+-        - sdk install gradle
+-        #- sdk use gradle
+-        - gradle --version
+-      install:
+-        # Accept SDK Licenses + Install NDK
+-        - yes | sdkmanager --update > /dev/null 2>&1
+-        - sdkmanager ndk-bundle > /dev/null 2>&1
+-      before_script:
+-        - pushd ./support
+-      script:
+-        - gradle clean
+-        - gradle assemble
+-      after_success:
+-        - popd;
+-        - tree ./libs
+ 
+ before_script:
+   - if [[ "${TRAVIS_OS_NAME}" == "linux" ]]; then export CXX=${COMPILER}; fi
+-- 
+2.21.0 (Apple Git-122.2)
+

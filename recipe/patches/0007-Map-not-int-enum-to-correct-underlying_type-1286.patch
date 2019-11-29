@@ -1,0 +1,47 @@
+From bcd9b9331a4d657152c9618819626c7d777cef83 Mon Sep 17 00:00:00 2001
+From: Egor Seredin <4819888+agmt@users.noreply.github.com>
+Date: Sat, 31 Aug 2019 22:25:38 +0900
+Subject: [PATCH 007/186] Map not int enum to correct underlying_type (#1286)
+
+* Map not int enum to correct underlying_type
+
+* Use non-zero constant in TestFixedEnum
+---
+ include/fmt/core.h  | 4 ++--
+ test/format-test.cc | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 7f7682be..43db49df 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -825,8 +825,8 @@ template <typename Context> struct arg_mapper {
+             FMT_ENABLE_IF(std::is_enum<T>::value &&
+                           !has_formatter<T, Context>::value &&
+                           !has_fallback_formatter<T, Context>::value)>
+-  FMT_CONSTEXPR int map(const T& val) {
+-    return static_cast<int>(val);
++  FMT_CONSTEXPR auto map(const T& val) -> decltype(map(static_cast<typename std::underlying_type<T>::type>(val))) {
++    return map(static_cast<typename std::underlying_type<T>::type>(val));
+   }
+   template <typename T,
+             FMT_ENABLE_IF(!is_string<T>::value && !is_char<T>::value &&
+diff --git a/test/format-test.cc b/test/format-test.cc
+index ffa0a9b2..3d619e50 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -1906,9 +1906,9 @@ TEST(FormatTest, FormatterNotSpecialized) {
+ }
+ 
+ #if FMT_HAS_FEATURE(cxx_strong_enums)
+-enum TestFixedEnum : short { B };
++enum TestFixedEnum : short { B = 1 };
+ 
+-TEST(FormatTest, FixedEnum) { EXPECT_EQ("0", fmt::format("{}", B)); }
++TEST(FormatTest, FixedEnum) { EXPECT_EQ("1", fmt::format("{}", B)); }
+ #endif
+ 
+ using buffer_range = fmt::buffer_range<char>;
+-- 
+2.21.0 (Apple Git-122.2)
+

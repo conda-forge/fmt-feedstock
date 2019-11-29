@@ -1,0 +1,66 @@
+From 0fc7bd157381e2d28a0b3d37948faa461024b018 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sat, 28 Sep 2019 09:13:32 -0700
+Subject: [PATCH 058/186] Fix ambiguity for types with dodgy conversions
+
+---
+ include/fmt/ranges.h |  3 ++-
+ test/ranges-test.cc  | 21 +++++++++++++++++----
+ 2 files changed, 19 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/ranges.h b/include/fmt/ranges.h
+index e031038a..6110fdaf 100644
+--- a/include/fmt/ranges.h
++++ b/include/fmt/ranges.h
+@@ -246,7 +246,8 @@ template <typename T, typename Char> struct is_range {
+   static FMT_CONSTEXPR_DECL const bool value =
+       internal::is_range_<T>::value &&
+       !internal::is_like_std_string<T>::value &&
+-      !std::is_convertible<T, std::basic_string<Char>>::value;
++      !std::is_convertible<T, std::basic_string<Char>>::value &&
++      !std::is_constructible<internal::std_string_view<Char>, T>::value;
+ };
+ 
+ template <typename RangeT, typename Char>
+diff --git a/test/ranges-test.cc b/test/ranges-test.cc
+index 56c8aa98..265f9acd 100644
+--- a/test/ranges-test.cc
++++ b/test/ranges-test.cc
+@@ -9,13 +9,13 @@
+ // All Rights Reserved
+ // {fmt} support for ranges, containers and types tuple interface.
+ 
+-/// Check if  'if constexpr' is supported.
++#include "fmt/ranges.h"
++#include "gtest.h"
++
++// Check if  'if constexpr' is supported.
+ #if (__cplusplus > 201402L) || \
+     (defined(_MSVC_LANG) && _MSVC_LANG > 201402L && _MSC_VER >= 1910)
+ 
+-#  include "fmt/ranges.h"
+-#  include "gtest.h"
+-
+ #  include <array>
+ #  include <map>
+ #  include <string>
+@@ -119,3 +119,16 @@ TEST(RangesTest, PathLike) {
+ 
+ #endif  // (__cplusplus > 201402L) || (defined(_MSVC_LANG) && _MSVC_LANG >
+         // 201402L && _MSC_VER >= 1910)
++
++#ifdef FMT_USE_STRING_VIEW
++struct string_like {
++  const char* begin();
++  const char* end();
++  explicit operator fmt::string_view() const { return "foo"; }
++  explicit operator std::string_view() const { return "foo"; }
++};
++
++TEST(RangesTest, FormatStringLike) {
++  EXPECT_EQ("foo", fmt::format("{}", string_like()));
++}
++#endif  // FMT_USE_STRING_VIEW
+-- 
+2.21.0 (Apple Git-122.2)
+

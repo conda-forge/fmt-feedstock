@@ -1,0 +1,184 @@
+From f18a3f36a7a4866b1841e0a85b9c3201e236ad72 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 1 Sep 2019 11:10:49 -0700
+Subject: [PATCH 016/186] Remove string_view_metadata
+
+string_view_metadata was introduced to make compiled format relocatable.
+However, format string compilation is an optimization and therefore
+adding overhead and extra complexity for relocation is undesirable.
+In most cases the string will be either static or outlive compilation
+and formatting and if it doesn't, it's possible to make compiled
+representation relocatale by other means.
+---
+ include/fmt/chrono.h  |  3 +--
+ include/fmt/compile.h | 23 ++++++++++-------------
+ include/fmt/format.h  | 29 +++++------------------------
+ 3 files changed, 16 insertions(+), 39 deletions(-)
+
+diff --git a/include/fmt/chrono.h b/include/fmt/chrono.h
+index 2b907b14..934f49f6 100644
+--- a/include/fmt/chrono.h
++++ b/include/fmt/chrono.h
+@@ -738,8 +738,7 @@ struct formatter<std::chrono::duration<Rep, Period>, Char> {
+ 
+     FMT_CONSTEXPR arg_ref_type make_arg_ref(basic_string_view<Char> arg_id) {
+       context.check_arg_id(arg_id);
+-      const auto str_val = internal::string_view_metadata(format_str, arg_id);
+-      return arg_ref_type(str_val);
++      return arg_ref_type(arg_id);
+     }
+ 
+     FMT_CONSTEXPR arg_ref_type make_arg_ref(internal::auto_id) {
+diff --git a/include/fmt/compile.h b/include/fmt/compile.h
+index 294a5084..ab630ca8 100644
+--- a/include/fmt/compile.h
++++ b/include/fmt/compile.h
+@@ -27,11 +27,11 @@ template <typename Char> struct format_part {
+   kind part_kind;
+   union value {
+     unsigned arg_index;
+-    string_view_metadata str;
++    basic_string_view<Char> str;
+     replacement repl;
+ 
+     FMT_CONSTEXPR value(unsigned index = 0) : arg_index(index) {}
+-    FMT_CONSTEXPR value(string_view_metadata s) : str(s) {}
++    FMT_CONSTEXPR value(basic_string_view<Char> s) : str(s) {}
+     FMT_CONSTEXPR value(replacement r) : repl(r) {}
+   } val;
+   std::size_t arg_id_end = 0;  // Position past the end of the argument id.
+@@ -42,10 +42,10 @@ template <typename Char> struct format_part {
+   static FMT_CONSTEXPR format_part make_arg_index(unsigned index) {
+     return format_part(kind::arg_index, index);
+   }
+-  static FMT_CONSTEXPR format_part make_arg_name(string_view_metadata name) {
++  static FMT_CONSTEXPR format_part make_arg_name(basic_string_view<Char> name) {
+     return format_part(kind::arg_name, name);
+   }
+-  static FMT_CONSTEXPR format_part make_text(string_view_metadata text) {
++  static FMT_CONSTEXPR format_part make_text(basic_string_view<Char> text) {
+     return format_part(kind::text, text);
+   }
+   static FMT_CONSTEXPR format_part make_replacement(replacement repl) {
+@@ -105,10 +105,8 @@ class format_string_compiler : public error_handler {
+         parse_context_(format_str) {}
+ 
+   FMT_CONSTEXPR void on_text(const Char* begin, const Char* end) {
+-    if (begin == end) return;
+-    const auto offset = begin - format_str_.data();
+-    const auto size = end - begin;
+-    handler_(part::make_text(string_view_metadata(offset, size)));
++    if (begin != end)
++      handler_(part::make_text({begin, to_unsigned(end - begin)}));
+   }
+ 
+   FMT_CONSTEXPR void on_arg_id() {
+@@ -121,7 +119,7 @@ class format_string_compiler : public error_handler {
+   }
+ 
+   FMT_CONSTEXPR void on_arg_id(basic_string_view<Char> id) {
+-    part_ = part::make_arg_name(string_view_metadata(format_str_, id));
++    part_ = part::make_arg_name(id);
+   }
+ 
+   FMT_CONSTEXPR void on_replacement_field(const Char* ptr) {
+@@ -191,7 +189,7 @@ class compiled_format {
+ 
+       switch (part.part_kind) {
+       case format_part_t::kind::text: {
+-        const auto text = value.str.to_view(format_view.data());
++        const auto text = value.str;
+         auto output = ctx.out();
+         auto&& it = internal::reserve(output, text.size());
+         it = std::copy_n(text.begin(), text.size(), it);
+@@ -205,15 +203,14 @@ class compiled_format {
+ 
+       case format_part_t::kind::arg_name: {
+         advance_parse_context_to_specification(parse_ctx, part);
+-        const auto named_arg_id = value.str.to_view(format_view.data());
++        const auto named_arg_id = value.str;
+         format_arg<Range>(parse_ctx, ctx, named_arg_id);
+       } break;
+       case format_part_t::kind::replacement: {
+         const auto& arg_id_value = value.repl.arg_id.val;
+         const auto arg = value.repl.arg_id.kind == arg_id_kind::index
+                              ? ctx.arg(arg_id_value.index)
+-                             : ctx.arg(arg_id_value.name.to_view(
+-                                   to_string_view(format_).data()));
++                             : ctx.arg(arg_id_value.name);
+ 
+         auto specs = value.repl.specs;
+ 
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 72a58396..e6e8bb10 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2114,24 +2114,6 @@ class specs_handler : public specs_setter<typename Context::char_type> {
+   Context& context_;
+ };
+ 
+-struct string_view_metadata {
+-  FMT_CONSTEXPR string_view_metadata() : offset_(0u), size_(0u) {}
+-  template <typename Char>
+-  FMT_CONSTEXPR string_view_metadata(basic_string_view<Char> primary_string,
+-                                     basic_string_view<Char> view)
+-      : offset_(to_unsigned(view.data() - primary_string.data())),
+-        size_(view.size()) {}
+-  FMT_CONSTEXPR string_view_metadata(std::size_t offset, std::size_t size)
+-      : offset_(offset), size_(size) {}
+-  template <typename Char>
+-  FMT_CONSTEXPR basic_string_view<Char> to_view(const Char* str) const {
+-    return {str + offset_, size_};
+-  }
+-
+-  std::size_t offset_;
+-  std::size_t size_;
+-};
+-
+ enum class arg_id_kind { none, index, name };
+ 
+ // An argument reference.
+@@ -2139,7 +2121,7 @@ template <typename Char> struct arg_ref {
+   FMT_CONSTEXPR arg_ref() : kind(arg_id_kind::none), val() {}
+   FMT_CONSTEXPR explicit arg_ref(int index)
+       : kind(arg_id_kind::index), val(index) {}
+-  FMT_CONSTEXPR explicit arg_ref(string_view_metadata name)
++  FMT_CONSTEXPR explicit arg_ref(basic_string_view<Char> name)
+       : kind(arg_id_kind::name), val(name) {}
+ 
+   FMT_CONSTEXPR arg_ref& operator=(int idx) {
+@@ -2152,10 +2134,10 @@ template <typename Char> struct arg_ref {
+   union value {
+     FMT_CONSTEXPR value() : index(0u) {}
+     FMT_CONSTEXPR value(int id) : index(id) {}
+-    FMT_CONSTEXPR value(string_view_metadata n) : name(n) {}
++    FMT_CONSTEXPR value(basic_string_view<Char> n) : name(n) {}
+ 
+     int index;
+-    string_view_metadata name;
++    basic_string_view<Char> name;
+   } val;
+ };
+ 
+@@ -2213,8 +2195,7 @@ class dynamic_specs_handler
+     context_.check_arg_id(arg_id);
+     basic_string_view<char_type> format_str(
+         context_.begin(), to_unsigned(context_.end() - context_.begin()));
+-    const auto id_metadata = string_view_metadata(format_str, arg_id);
+-    return arg_ref_type(id_metadata);
++    return arg_ref_type(arg_id);
+   }
+ 
+   dynamic_format_specs<char_type>& specs_;
+@@ -2585,7 +2566,7 @@ void handle_dynamic_spec(Spec& value, arg_ref<typename Context::char_type> ref,
+                                         ctx.error_handler());
+     break;
+   case arg_id_kind::name: {
+-    const auto arg_id = ref.val.name.to_view(format_str);
++    const auto arg_id = ref.val.name;
+     internal::set_dynamic_spec<Handler>(value, ctx.arg(arg_id),
+                                         ctx.error_handler());
+     break;
+-- 
+2.21.0 (Apple Git-122.2)
+

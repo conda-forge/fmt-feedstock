@@ -1,0 +1,47 @@
+From 213e09644f94526533bb840de518ae794e3cfaa5 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 1 Nov 2019 08:37:51 -0700
+Subject: [PATCH 105/186] Workaround X11 madness (#1388)
+
+---
+ include/fmt/format.h | 4 ++--
+ test/format-test.cc  | 6 ++++++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 35b9c1c5..4c8e32b7 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2178,8 +2178,8 @@ template <typename Char> struct arg_ref {
+ 
+   arg_id_kind kind;
+   union value {
+-    FMT_CONSTEXPR value() : index(0u) {}
+-    FMT_CONSTEXPR value(int id) : index(id) {}
++    FMT_CONSTEXPR value() : index{0u} {}
++    FMT_CONSTEXPR value(int id) : index{id} {}
+     FMT_CONSTEXPR value(basic_string_view<Char> n) : name(n) {}
+ 
+     int index;
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 67eb9be8..f5a35569 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -20,8 +20,14 @@
+ #  include <windows.h>
+ #endif
+ 
++// Check if fmt/format.h compiles with the X11 index macro defined.
++#define index(x, y) no nice things
++
+ #include "fmt/color.h"
+ #include "fmt/format.h"
++
++#undef index
++
+ #include "gmock.h"
+ #include "gtest-extra.h"
+ #include "mock-allocator.h"
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,59 @@
+From bb0c8bfea8608670063e7bd549279f630a5f4ede Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Thu, 7 Nov 2019 12:56:09 -0800
+Subject: [PATCH 118/186] [clang-tidy] Add noexcept where move is used
+
+Found with performance-noexcept-move-constructor
+
+Signed-off-by: Rosen Penev <rosenp@gmail.com>
+---
+ include/fmt/format.h | 4 ++--
+ include/fmt/posix.h  | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 5f6519e4..329e343f 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -607,14 +607,14 @@ class basic_memory_buffer : private Allocator, public internal::buffer<T> {
+     of the other object to it.
+     \endrst
+    */
+-  basic_memory_buffer(basic_memory_buffer&& other) { move(other); }
++  basic_memory_buffer(basic_memory_buffer&& other) FMT_NOEXCEPT { move(other); }
+ 
+   /**
+     \rst
+     Moves the content of the other ``basic_memory_buffer`` object to this one.
+     \endrst
+    */
+-  basic_memory_buffer& operator=(basic_memory_buffer&& other) {
++  basic_memory_buffer& operator=(basic_memory_buffer&& other) FMT_NOEXCEPT {
+     assert(this != &other);
+     deallocate();
+     move(other);
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index 5c306d30..3ed3b055 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -146,7 +146,7 @@ class buffered_file {
+     other.file_ = nullptr;
+   }
+ 
+-  buffered_file& operator=(buffered_file&& other) {
++  buffered_file& operator=(buffered_file&& other) FMT_NOEXCEPT {
+     close();
+     file_ = other.file_;
+     other.file_ = nullptr;
+@@ -209,7 +209,7 @@ class file {
+ 
+   file(file&& other) FMT_NOEXCEPT : fd_(other.fd_) { other.fd_ = -1; }
+ 
+-  file& operator=(file&& other) {
++  file& operator=(file&& other) FMT_NOEXCEPT {
+     close();
+     fd_ = other.fd_;
+     other.fd_ = -1;
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,39 @@
+From 9cbf4b087ca0be1b8c146a5dc10dfdcc3fb4c75e Mon Sep 17 00:00:00 2001
+From: Florin Iucha <florin@signbit.net>
+Date: Wed, 27 Nov 2019 11:59:19 -0500
+Subject: [PATCH 181/186] Fix -Wconversion warnings
+
+---
+ include/fmt/core.h   | 2 +-
+ include/fmt/format.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index a73bdbb6..80869b82 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -1242,7 +1242,7 @@ template <typename Context> class basic_format_args {
+ 
+   internal::type type(int index) const {
+     int shift = index * internal::packed_arg_bits;
+-    int mask = (1 << internal::packed_arg_bits) - 1;
++    unsigned int mask = (1 << internal::packed_arg_bits) - 1;
+     return static_cast<internal::type>((types_ >> shift) & mask);
+   }
+ 
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index c2c31d8d..e57b2b2c 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -1572,7 +1572,7 @@ template <typename Range> class basic_writer {
+         basic_string_view<char_type> s(&sep, sep_size);
+         // Index of a decimal digit with the least significant digit having
+         // index 0.
+-        unsigned digit_index = 0;
++        int digit_index = 0;
+         std::string::const_iterator group = groups.cbegin();
+         it = format_decimal<char_type>(
+             it, abs_value, size,
+-- 
+2.21.0 (Apple Git-122.2)
+

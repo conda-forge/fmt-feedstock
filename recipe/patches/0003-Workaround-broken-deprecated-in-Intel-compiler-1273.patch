@@ -1,0 +1,59 @@
+From 744302add085f30120c57f73cddbcb826cc92de9 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Wed, 28 Aug 2019 05:58:09 -0700
+Subject: [PATCH 003/186] Workaround broken [[deprecated]] in Intel compiler
+ (#1273)
+
+---
+ include/fmt/core.h   | 10 ++++++++--
+ include/fmt/format.h |  6 +++---
+ 2 files changed, 11 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index bcce2f50..2dc6ed55 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -132,6 +132,12 @@
+ #    endif
+ #  endif
+ #endif
++// Workaround broken [[deprecated]] in the Intel compiler.
++#ifdef __INTEL_COMPILER
++#  define FMT_DEPRECATED_ALIAS
++#else
++#  define FMT_DEPRECATED_ALIAS FMT_DEPRECATED
++#endif
+ 
+ #ifndef FMT_BEGIN_NAMESPACE
+ #  if FMT_HAS_FEATURE(cxx_inline_namespaces) || FMT_GCC_VERSION >= 404 || \
+@@ -474,8 +480,8 @@ class basic_parse_context : private ErrorHandler {
+ using format_parse_context = basic_parse_context<char>;
+ using wformat_parse_context = basic_parse_context<wchar_t>;
+ 
+-using parse_context FMT_DEPRECATED = basic_parse_context<char>;
+-using wparse_context FMT_DEPRECATED = basic_parse_context<wchar_t>;
++using parse_context FMT_DEPRECATED_ALIAS = basic_parse_context<char>;
++using wparse_context FMT_DEPRECATED_ALIAS = basic_parse_context<wchar_t>;
+ 
+ template <typename Context> class basic_format_arg;
+ template <typename Context> class basic_format_args;
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 5d6be744..6762e6bc 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2595,9 +2595,9 @@ void handle_dynamic_spec(Spec& value, arg_ref<typename Context::char_type> ref,
+ }  // namespace internal
+ 
+ template <typename Range>
+-using basic_writer FMT_DEPRECATED = internal::basic_writer<Range>;
+-using writer FMT_DEPRECATED = internal::writer;
+-using wwriter FMT_DEPRECATED =
++using basic_writer FMT_DEPRECATED_ALIAS = internal::basic_writer<Range>;
++using writer FMT_DEPRECATED_ALIAS = internal::writer;
++using wwriter FMT_DEPRECATED_ALIAS =
+     internal::basic_writer<internal::buffer_range<wchar_t>>;
+ 
+ /** The default argument formatter. */
+-- 
+2.21.0 (Apple Git-122.2)
+

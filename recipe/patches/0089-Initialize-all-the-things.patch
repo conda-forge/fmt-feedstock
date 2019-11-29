@@ -1,0 +1,60 @@
+From 8498bc97dd30b6c75a43652d8d58b0da31946fc5 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Sun, 20 Oct 2019 17:12:19 -0700
+Subject: [PATCH 089/186] Initialize all the things
+
+---
+ include/fmt/format.h | 12 +++++-------
+ test/format-test.cc  |  6 +++---
+ 2 files changed, 8 insertions(+), 10 deletions(-)
+
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 1eb3d440..5b42b20a 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -2528,10 +2528,9 @@ FMT_CONSTEXPR const typename ParseContext::char_type* parse_format_specs(
+       conditional_t<internal::mapped_type_constant<T, context>::value !=
+                         internal::custom_type,
+                     decltype(arg_mapper<context>().map(std::declval<T>())), T>;
+-  conditional_t<has_formatter<mapped_type, context>::value,
+-                formatter<mapped_type, char_type>,
+-                internal::fallback_formatter<T, char_type>>
+-      f;
++  auto f = conditional_t<has_formatter<mapped_type, context>::value,
++                         formatter<mapped_type, char_type>,
++                         internal::fallback_formatter<T, char_type>>();
+   return f.parse(ctx);
+ }
+ 
+@@ -2816,9 +2815,8 @@ void internal::basic_writer<Range>::write_fp(T value,
+   bool use_grisu = USE_GRISU &&
+                    (specs.type != 'a' && specs.type != 'A' &&
+                     specs.type != 'e' && specs.type != 'E') &&
+-                   internal::grisu_format(
+-                       static_cast<double>(value), buffer, precision,
+-                       options, exp);
++                   internal::grisu_format(static_cast<double>(value), buffer,
++                                          precision, options, exp);
+   char* decimal_point_pos = nullptr;
+   if (!use_grisu)
+     decimal_point_pos = internal::sprintf_format(value, buffer, specs);
+diff --git a/test/format-test.cc b/test/format-test.cc
+index a9022eac..8bd2fe9d 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -2293,9 +2293,9 @@ struct test_context {
+ 
+ template <size_t N>
+ FMT_CONSTEXPR fmt::format_specs parse_specs(const char (&s)[N]) {
+-  fmt::format_specs specs;
+-  test_parse_context parse_ctx;
+-  test_context ctx{};
++  auto specs = fmt::format_specs();
++  auto parse_ctx = test_parse_context();
++  auto ctx = test_context();
+   fmt::internal::specs_handler<test_parse_context, test_context> h(
+       specs, parse_ctx, ctx);
+   parse_format_specs(s, s + N, h);
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,27 @@
+From ea54b21e7886dc52d759e78f90d863f5bf450fc1 Mon Sep 17 00:00:00 2001
+From: Florin Iucha <florin@signbit.net>
+Date: Wed, 27 Nov 2019 13:03:30 -0500
+Subject: [PATCH 182/186] Remove invalid noexcept annotation
+
+buffered_file& operator=(buffered_file&& other) calls close which can
+throw.
+---
+ include/fmt/posix.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index 089e3dda..e68e226f 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -157,7 +157,7 @@ class buffered_file {
+     other.file_ = nullptr;
+   }
+ 
+-  buffered_file& operator=(buffered_file&& other) FMT_NOEXCEPT {
++  buffered_file& operator=(buffered_file&& other) {
+     close();
+     file_ = other.file_;
+     other.file_ = nullptr;
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -1,0 +1,49 @@
+From 1f918159edded99c9c0cf005c96ecc12e4cc92b1 Mon Sep 17 00:00:00 2001
+From: Rosen Penev <rosenp@gmail.com>
+Date: Thu, 7 Nov 2019 13:10:32 -0800
+Subject: [PATCH 122/186] [clang-tidy] Replace deprecated C headers
+
+Found with modernize-deprecated-headers
+
+Signed-off-by: Rosen Penev <rosenp@gmail.com>
+---
+ include/fmt/format-inl.h | 2 +-
+ include/fmt/posix.h      | 8 ++++----
+ 2 files changed, 5 insertions(+), 5 deletions(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index a231ab1d..d9e37d20 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -10,7 +10,7 @@
+ 
+ #include "format.h"
+ 
+-#include <string.h>
++#include <cstring>
+ 
+ #include <cctype>
+ #include <cerrno>
+diff --git a/include/fmt/posix.h b/include/fmt/posix.h
+index 3ed3b055..0651f047 100644
+--- a/include/fmt/posix.h
++++ b/include/fmt/posix.h
+@@ -13,11 +13,11 @@
+ #  undef __STRICT_ANSI__
+ #endif
+ 
+-#include <errno.h>
++#include <cerrno>
+ #include <fcntl.h>   // for O_RDONLY
+-#include <locale.h>  // for locale_t
+-#include <stdio.h>
+-#include <stdlib.h>  // for strtod_l
++#include <clocale>  // for locale_t
++#include <cstdio>
++#include <cstdlib>  // for strtod_l
+ 
+ #include <cstddef>
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

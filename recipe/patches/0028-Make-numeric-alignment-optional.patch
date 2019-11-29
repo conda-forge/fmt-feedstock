@@ -1,0 +1,181 @@
+From f7a4b4ab9163690bf054889f4700636f74f96e5d Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Fri, 6 Sep 2019 07:12:35 -0700
+Subject: [PATCH 028/186] Make numeric alignment optional
+
+---
+ doc/syntax.rst          | 13 +++++--------
+ include/fmt/format.h    |  6 ++++++
+ test/format-test.cc     | 20 +++++++++++++-------
+ test/ostream-test.cc    |  2 ++
+ test/std-format-test.cc |  8 ++------
+ 5 files changed, 28 insertions(+), 21 deletions(-)
+
+diff --git a/doc/syntax.rst b/doc/syntax.rst
+index b906c987..1f25dacf 100644
+--- a/doc/syntax.rst
++++ b/doc/syntax.rst
+@@ -101,11 +101,6 @@ The meaning of the various alignment options is as follows:
+ | ``'>'`` | Forces the field to be right-aligned within the          |
+ |         | available space (this is the default for numbers).       |
+ +---------+----------------------------------------------------------+
+-| ``'='`` | Forces the padding to be placed after the sign (if any)  |
+-|         | but before the digits.  This is used for printing fields |
+-|         | in the form '+000000120'. This alignment option is only  |
+-|         | valid for numeric types.                                 |
+-+---------+----------------------------------------------------------+
+ | ``'^'`` | Forces the field to be centered within the available     |
+ |         | space.                                                   |
+ +---------+----------------------------------------------------------+
+@@ -154,9 +149,11 @@ conversions, trailing zeros are not removed from the result.
+ *width* is a decimal integer defining the minimum field width.  If not
+ specified, then the field width will be determined by the content.
+ 
+-Preceding the *width* field by a zero (``'0'``) character enables
+-sign-aware zero-padding for numeric types.  This is equivalent to a *fill*
+-character of ``'0'`` with an *alignment* type of ``'='``.
++Preceding the *width* field by a zero (``'0'``) character enables sign-aware
++zero-padding for numeric types. It forces the padding to be placed after the
++sign or base (if any) but before the digits. This is used for printing fields in
++the form '+000000120'. This option is only valid for numeric types and it has no
++effect on formatting of infinity and NaN.
+ 
+ The *precision* is a decimal number indicating how many digits should be
+ displayed after the decimal point for a floating-point value formatted with
+diff --git a/include/fmt/format.h b/include/fmt/format.h
+index 2c4cda3e..11da085f 100644
+--- a/include/fmt/format.h
++++ b/include/fmt/format.h
+@@ -185,6 +185,10 @@ inline uint32_t clzll(uint64_t x) {
+ FMT_END_NAMESPACE
+ #endif
+ 
++#ifndef FMT_NUMERIC_ALIGN
++# define FMT_NUMERIC_ALIGN 1
++#endif
++
+ FMT_BEGIN_NAMESPACE
+ namespace internal {
+ 
+@@ -2300,9 +2304,11 @@ FMT_CONSTEXPR const Char* parse_align(const Char* begin, const Char* end,
+     case '>':
+       align = align::right;
+       break;
++#if FMT_NUMERIC_ALIGN
+     case '=':
+       align = align::numeric;
+       break;
++#endif
+     case '^':
+       align = align::center;
+       break;
+diff --git a/test/format-test.cc b/test/format-test.cc
+index 1637bdd2..bdc57886 100644
+--- a/test/format-test.cc
++++ b/test/format-test.cc
+@@ -697,12 +697,6 @@ TEST(FormatToTest, WideString) {
+   EXPECT_STREQ(buf.data(), L"42");
+ }
+ 
+-TEST(FormatToTest, FormatToNonbackInsertIteratorWithSignAndNumericAlignment) {
+-  char buffer[16] = {};
+-  fmt::format_to(fmt::internal::make_checked(buffer, 16), "{: =+}", 42.0);
+-  EXPECT_STREQ("+42.0", buffer);
+-}
+-
+ TEST(FormatToTest, FormatToMemoryBuffer) {
+   fmt::basic_memory_buffer<char, 100> buffer;
+   fmt::format_to(buffer, "{}", "foo");
+@@ -856,6 +850,7 @@ TEST(FormatterTest, RightAlign) {
+   EXPECT_EQ("  0xface", format("{0:>8}", reinterpret_cast<void*>(0xface)));
+ }
+ 
++#if FMT_NUMERIC_ALIGN
+ TEST(FormatterTest, NumericAlign) {
+   EXPECT_EQ("  42", format("{0:=4}", 42));
+   EXPECT_EQ("+ 42", format("{0:=+4}", 42));
+@@ -882,6 +877,13 @@ TEST(FormatterTest, NumericAlign) {
+   EXPECT_EQ(" 1.0", fmt::format("{:= }", 1.0));
+ }
+ 
++TEST(FormatToTest, FormatToNonbackInsertIteratorWithSignAndNumericAlignment) {
++  char buffer[16] = {};
++  fmt::format_to(fmt::internal::make_checked(buffer, 16), "{: =+}", 42.0);
++  EXPECT_STREQ("+42.0", buffer);
++}
++#endif
++
+ TEST(FormatterTest, CenterAlign) {
+   EXPECT_EQ(" 42  ", format("{0:^5}", 42));
+   EXPECT_EQ(" 42  ", format("{0:^5o}", 042));
+@@ -2055,8 +2057,10 @@ TEST(FormatTest, DynamicFormatter) {
+                    "cannot switch from manual to automatic argument indexing");
+   EXPECT_THROW_MSG(format("{:{0}}", num), format_error,
+                    "cannot switch from automatic to manual argument indexing");
++#if FMT_NUMERIC_ALIGN
+   EXPECT_THROW_MSG(format("{:=}", str), format_error,
+                    "format specifier requires numeric argument");
++#endif
+   EXPECT_THROW_MSG(format("{:+}", str), format_error,
+                    "format specifier requires numeric argument");
+   EXPECT_THROW_MSG(format("{:-}", str), format_error,
+@@ -2439,13 +2443,15 @@ TEST(FormatTest, FormatStringErrors) {
+   EXPECT_ERROR("{0:s", "unknown format specifier", Date);
+ #  if FMT_MSC_VER >= 1916
+   // This causes an internal compiler error in MSVC2017.
+-  EXPECT_ERROR("{0:=5", "unknown format specifier", int);
+   EXPECT_ERROR("{:{<}", "invalid fill character '{'", int);
+   EXPECT_ERROR("{:10000000000}", "number is too big", int);
+   EXPECT_ERROR("{:.10000000000}", "number is too big", int);
+   EXPECT_ERROR_NOARGS("{:x}", "argument index out of range");
++#if FMT_NUMERIC_ALIGN
++  EXPECT_ERROR("{0:=5", "unknown format specifier", int);
+   EXPECT_ERROR("{:=}", "format specifier requires numeric argument",
+                const char*);
++#endif
+   EXPECT_ERROR("{:+}", "format specifier requires numeric argument",
+                const char*);
+   EXPECT_ERROR("{:-}", "format specifier requires numeric argument",
+diff --git a/test/ostream-test.cc b/test/ostream-test.cc
+index 8c2e814a..e5e7b4c4 100644
+--- a/test/ostream-test.cc
++++ b/test/ostream-test.cc
+@@ -95,8 +95,10 @@ TEST(OStreamTest, Format) {
+ TEST(OStreamTest, FormatSpecs) {
+   EXPECT_EQ("def  ", format("{0:<5}", TestString("def")));
+   EXPECT_EQ("  def", format("{0:>5}", TestString("def")));
++#if FMT_NUMERIC_ALIGN
+   EXPECT_THROW_MSG(format("{0:=5}", TestString("def")), format_error,
+                    "format specifier requires numeric argument");
++#endif
+   EXPECT_EQ(" def ", format("{0:^5}", TestString("def")));
+   EXPECT_EQ("def**", format("{0:*<5}", TestString("def")));
+   EXPECT_THROW_MSG(format("{0:+}", TestString()), format_error,
+diff --git a/test/std-format-test.cc b/test/std-format-test.cc
+index 2fd60d41..4e2ad3b0 100644
+--- a/test/std-format-test.cc
++++ b/test/std-format-test.cc
+@@ -30,18 +30,14 @@ TEST(StdFormatTest, Alignment) {
+   // Error: '=' with charT and no integer presentation type
+   EXPECT_THROW(string s5 = format("{:=6}", 'x'), std::format_error);
+   string s6 = format("{:6d}", c);       // s6 == "   120"
+-  string s7 = format("{:=+06d}", c);    // s7 == "+00120"
+-  string s8 = format("{:0=#6x}", 0xa);  // s8 == "0x000a"
+-  string s9 = format("{:6}", true);     // s9 == "true  "
++  string s7 = format("{:6}", true);     // s9 == "true  "
+   EXPECT_EQ(s0, "    42");
+   EXPECT_EQ(s1, "x     ");
+   EXPECT_EQ(s2, "x*****");
+   EXPECT_EQ(s3, "*****x");
+   EXPECT_EQ(s4, "**x***");
+   EXPECT_EQ(s6, "   120");
+-  EXPECT_EQ(s7, "+00120");
+-  EXPECT_EQ(s8, "0x000a");
+-  EXPECT_EQ(s9, "true  ");
++  EXPECT_EQ(s7, "true  ");
+ }
+ 
+ TEST(StdFormatTest, Float) {
+-- 
+2.21.0 (Apple Git-122.2)
+

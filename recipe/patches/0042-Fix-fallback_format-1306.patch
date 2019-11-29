@@ -1,0 +1,25 @@
+From c6d1a94a9f949727d75e8e5f7596426eaf7e5956 Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 9 Sep 2019 17:28:53 -0700
+Subject: [PATCH 042/186] Fix fallback_format (#1306)
+
+---
+ include/fmt/format-inl.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
+index cef1155f..62de4bff 100644
+--- a/include/fmt/format-inl.h
++++ b/include/fmt/format-inl.h
+@@ -770,7 +770,7 @@ template <int GRISU_VERSION> struct grisu_shortest_handler {
+   }
+ };
+ 
+-FMT_API void fallback_format(const fp& value, int exp10) {
++FMT_FUNC void fallback_format(const fp& value, int exp10) {
+   (void)value; // TODO
+   (void)exp10;
+ }
+-- 
+2.21.0 (Apple Git-122.2)
+

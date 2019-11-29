@@ -1,0 +1,184 @@
+From b4f1988c4b1aca7e15ce32d74d3ec47180022f21 Mon Sep 17 00:00:00 2001
+From: Jeremy Ong <jeremycong@gmail.com>
+Date: Wed, 25 Sep 2019 19:23:39 -0600
+Subject: [PATCH 057/186] Provide overload for `fmt::join` that handles
+ `std::tuple`s
+
+Address enhancement request #1322.
+
+The overload is provided in `ranges` (original `fmt::join` exists
+currently in `format.h` for historical reasons.
+
+Tests for prvalue and lvalue tuple arguments as well as the empty
+tuple are provided in `ranges-test.cc`.
+---
+ doc/api.rst          | 27 ++++++++++++++++
+ include/fmt/ranges.h | 76 ++++++++++++++++++++++++++++++++++++++++++++
+ test/ranges-test.cc  | 19 +++++++++++
+ 3 files changed, 122 insertions(+)
+
+diff --git a/doc/api.rst b/doc/api.rst
+index 46231aa2..247d0ee7 100644
+--- a/doc/api.rst
++++ b/doc/api.rst
+@@ -10,6 +10,8 @@ The {fmt} library API consists of the following parts:
+   facilities and a lightweight subset of formatting functions
+ * :ref:`fmt/format.h <format-api>`: the full format API providing compile-time
+   format string checks, output iterator and user-defined type support
++* :ref:`fmt/ranges.h <ranges-api>`: additional formatting support for ranges
++  and tuples
+ * :ref:`fmt/chrono.h <chrono-api>`: date and time formatting
+ * :ref:`fmt/ostream.h <ostream-api>`: ``std::ostream`` support
+ * :ref:`fmt/printf.h <printf-api>`: ``printf`` formatting
+@@ -317,6 +319,31 @@ custom argument formatter class::
+ .. doxygenclass:: fmt::arg_formatter
+    :members:
+ 
++.. _ranges-api:
++
++Ranges and Tuple Formatting
++===========================
++
++The library also supports convenient formatting of ranges and tuples::
++
++  #include <fmt/ranges.h>
++
++  std::tuple<char, int, float> t{'a', 1, 2.0f};
++  // Prints "('a', 1, 2.0)"
++  fmt::print("{}", t);
++
++
++NOTE: currently, the overload of ``fmt::join`` for iterables exists in the main
++``format.h`` header, but expect this to change in the future.
++
++Using ``fmt::join``, you can separate tuple elements with a custom separator::
++
++  #include <fmt/ranges.h>
++
++  std::tuple<int, char> t = {1, 'a'};
++  // Prints "1, a"
++  fmt::print("{}", fmt::join(t, ", "));
++
+ .. _chrono-api:
+ 
+ Date and Time Formatting
+diff --git a/include/fmt/ranges.h b/include/fmt/ranges.h
+index cf0d41aa..e031038a 100644
+--- a/include/fmt/ranges.h
++++ b/include/fmt/ranges.h
+@@ -283,6 +283,82 @@ struct formatter<RangeT, Char,
+   }
+ };
+ 
++template <typename Char, typename... T> struct tuple_arg_join : internal::view {
++  const std::tuple<T...>& tuple;
++  basic_string_view<Char> sep;
++
++  tuple_arg_join(const std::tuple<T...>& t, basic_string_view<Char> s)
++      : tuple{t}, sep{s} {}
++};
++
++template <typename Char, typename... T>
++struct formatter<tuple_arg_join<Char, T...>, Char> {
++  template <typename ParseContext>
++  FMT_CONSTEXPR auto parse(ParseContext& ctx) -> decltype(ctx.begin()) {
++    return ctx.begin();
++  }
++
++  template <typename FormatContext>
++  typename FormatContext::iterator format(
++      const tuple_arg_join<Char, T...>& value, FormatContext& ctx) {
++    return format(value, ctx, internal::make_index_sequence<sizeof...(T)>{});
++  }
++
++ private:
++  template <typename FormatContext, size_t... N>
++  typename FormatContext::iterator format(
++      const tuple_arg_join<Char, T...>& value, FormatContext& ctx,
++      internal::index_sequence<N...>) {
++    return format_args(value, ctx, std::get<N>(value.tuple)...);
++  }
++
++  template <typename FormatContext>
++  typename FormatContext::iterator format_args(
++      const tuple_arg_join<Char, T...>&, FormatContext& ctx) {
++    // NOTE: for compilers that support C++17, this empty function instantiation
++    // can be replaced with a constexpr branch in the variadic overload.
++    return ctx.out();
++  }
++
++  template <typename FormatContext, typename Arg, typename... Args>
++  typename FormatContext::iterator format_args(
++      const tuple_arg_join<Char, T...>& value, FormatContext& ctx,
++      const Arg& arg, const Args&... args) {
++    using base = formatter<typename std::decay<Arg>::type, Char>;
++    auto out = ctx.out();
++    out = base{}.format(arg, ctx);
++    if (sizeof...(Args) > 0) {
++      out = std::copy(value.sep.begin(), value.sep.end(), out);
++      ctx.advance_to(out);
++      return format_args(value, ctx, args...);
++    }
++    return out;
++  }
++};
++
++/**
++  \rst
++  Returns an object that formats `tuple` with elements separated by `sep`.
++
++  **Example**::
++
++    std::tuple<int, char> t = {1, 'a'};
++    fmt::print("{}", fmt::join(t, ", "));
++    // Output: "1, a"
++  \endrst
++ */
++template <typename... T>
++FMT_CONSTEXPR tuple_arg_join<char, T...> join(const std::tuple<T...>& tuple,
++                                              string_view sep) {
++  return {tuple, sep};
++}
++
++template <typename... T>
++FMT_CONSTEXPR tuple_arg_join<wchar_t, T...> join(const std::tuple<T...>& tuple,
++                                                 wstring_view sep) {
++  return {tuple, sep};
++}
++
+ FMT_END_NAMESPACE
+ 
+ #endif  // FMT_RANGES_H_
+diff --git a/test/ranges-test.cc b/test/ranges-test.cc
+index 7d4b6d24..56c8aa98 100644
+--- a/test/ranges-test.cc
++++ b/test/ranges-test.cc
+@@ -49,6 +49,25 @@ TEST(RangesTest, FormatTuple) {
+   EXPECT_EQ("(42, 1.5, \"this is tuple\", 'i')", fmt::format("{}", tu1));
+ }
+ 
++TEST(RangesTest, JoinTuple) {
++  // Value tuple args
++  std::tuple<char, int, float> t1 = std::make_tuple('a', 1, 2.0f);
++  EXPECT_EQ("(a, 1, 2.0)", fmt::format("({})", fmt::join(t1, ", ")));
++
++  // Testing lvalue tuple args
++  int x = 4;
++  std::tuple<char, int&> t2{'b', x};
++  EXPECT_EQ("b + 4", fmt::format("{}", fmt::join(t2, " + ")));
++
++  // Empty tuple
++  std::tuple<> t3;
++  EXPECT_EQ("", fmt::format("{}", fmt::join(t3, "|")));
++
++  // Single element tuple
++  std::tuple<float> t4{4.0f};
++  EXPECT_EQ("4.0", fmt::format("{}", fmt::join(t4, "/")));
++}
++
+ struct my_struct {
+   int32_t i;
+   std::string str;  // can throw
+-- 
+2.21.0 (Apple Git-122.2)
+
