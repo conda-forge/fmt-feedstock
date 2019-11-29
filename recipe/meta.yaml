@@ -5,6 +5,10 @@
 package:
   name: {{ name|lower }}
   version: {{ version }}
+
+source:
+  url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
+  sha256: {{ sha256 }}
   patches:
       - 0001-Fix-typos.patch
       - 0002-Eliminate-shadow-variable-warning.patch
@@ -192,10 +196,6 @@ package:
       - 0184-Update-docs.patch
       - 0185-Fix-fallback-pointer-formatting-on-big-endian.patch
       - 0186-Fixing-installation-directory-of-.dll-files-on-Windo.patch
-
-source:
-  url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
-  sha256: {{ sha256 }}
 
 build:
   number: 3
