@@ -1,7 +1,3 @@
-#!/bin/bash
-
-mkdir build
-cd build
 
 cmake \
   -DCMAKE_PREFIX_PATH:PATH=${PREFIX} \
@@ -12,6 +8,6 @@ cmake \
   -DFMT_TEST=OFF \
   -DFMT_DOC=OFF \
   -DFMT_INSTALL=ON \
-  ..
+  .
 
 make -j${CPU_COUNT} install
