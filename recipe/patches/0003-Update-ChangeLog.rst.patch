@@ -1,0 +1,25 @@
+From b160123e39cf9ceed8b18a2d8bacdef22033e11b Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <victor.zverovich@gmail.com>
+Date: Mon, 2 Dec 2019 16:18:06 -0800
+Subject: [PATCH 3/5] Update ChangeLog.rst
+
+---
+ ChangeLog.rst | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/ChangeLog.rst b/ChangeLog.rst
+index 25d1b200..cdec766f 100644
+--- a/ChangeLog.rst
++++ b/ChangeLog.rst
+@@ -92,7 +92,7 @@
+ 
+   Thanks `@jeremyong (Jeremy Ong) <https://github.com/jeremyong>`_.
+ 
+-* Changed formatting of octal zero with prefix from "0o0" to "0":
++* Changed formatting of octal zero with prefix from "00" to "0":
+ 
+   .. code:: c++
+ 
+-- 
+2.21.0 (Apple Git-122.2)
+

@@ -9,6 +9,12 @@ package:
 source:
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
   sha256: {{ sha256 }}
+  patches:
+    patches/0001-Add-a-missing-decimal-point-in-exponent-notation-wit.patch
+    patches/0002-Fix-compilation-with-MinGW.patch
+    patches/0003-Update-ChangeLog.rst.patch
+    patches/0004-Export-assert_fail-with-FMT_API.-This-fixes-dll-buil.patch
+    patches/0005-Remove-unneeded-FMT_API.patch
 
 build:
   number: 0
