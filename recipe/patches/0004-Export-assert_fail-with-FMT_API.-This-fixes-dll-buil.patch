@@ -1,7 +1,7 @@
 From 1a599117d8ef331e68eb0d808d1fa04a48b1fcf2 Mon Sep 17 00:00:00 2001
 From: Egor Pugin <egor.pugin@gmail.com>
 Date: Tue, 3 Dec 2019 04:14:16 +0300
-Subject: [PATCH 4/6] Export assert_fail with FMT_API. This fixes dll build.
+Subject: [PATCH 4/7] Export assert_fail with FMT_API. This fixes dll build.
 
 ---
  include/fmt/core.h       | 2 +-

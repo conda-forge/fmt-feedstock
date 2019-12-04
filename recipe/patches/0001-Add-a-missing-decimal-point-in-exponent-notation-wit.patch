@@ -1,7 +1,7 @@
 From 8bbe76af3a5427597185ad6207ee6e588d2eb0fd Mon Sep 17 00:00:00 2001
 From: Victor Zverovich <victor.zverovich@gmail.com>
 Date: Mon, 2 Dec 2019 11:36:33 -0800
-Subject: [PATCH 1/6] Add a missing decimal point in exponent notation with
+Subject: [PATCH 1/7] Add a missing decimal point in exponent notation with
  trailing zeros
 
 ---

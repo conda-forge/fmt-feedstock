@@ -1,7 +1,7 @@
 From 168460f02c0f720ea4a1bfef82116632ce7f2d9e Mon Sep 17 00:00:00 2001
 From: Victor Zverovich <victor.zverovich@gmail.com>
 Date: Tue, 3 Dec 2019 06:45:00 -0800
-Subject: [PATCH 6/6] Remove TYPES
+Subject: [PATCH 6/7] Remove TYPES
 
 ---
  include/fmt/core.h | 1 -

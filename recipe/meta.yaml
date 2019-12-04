@@ -16,6 +16,7 @@ source:
     - patches/0004-Export-assert_fail-with-FMT_API.-This-fixes-dll-buil.patch
     - patches/0005-Remove-unneeded-FMT_API.patch
     - patches/0006-Remove-TYPES.patch
+    - patches/0007-Revert-1433-because-of-build-failures-1450.patch
 
 build:
   number: 0
