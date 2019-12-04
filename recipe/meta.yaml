@@ -1,18 +1,25 @@
 {% set name = "fmt" %}
-{% set version = "6.0.0" %}
-{% set sha256 = "f1907a58d5e86e6c382e51441d92ad9e23aea63827ba47fd647eacc0d3a16c78" %}
+{% set version = "6.1.0" %}
+{% set sha256 = "8fb84291a7ed6b4db4769115b57fa56d5467b1ab8c3ba5bdf78c820e4bd17944" %}
 
 package:
   name: {{ name|lower }}
   version: {{ version }}
 
 source:
-  fn: {{ name }}-{{ version }}.tar.gz
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
   sha256: {{ sha256 }}
+  patches:
+    - patches/0001-Add-a-missing-decimal-point-in-exponent-notation-wit.patch
+    - patches/0002-Fix-compilation-with-MinGW.patch
+    - patches/0003-Update-ChangeLog.rst.patch
+    - patches/0004-Export-assert_fail-with-FMT_API.-This-fixes-dll-buil.patch
+    - patches/0005-Remove-unneeded-FMT_API.patch
+    - patches/0006-Remove-TYPES.patch
+    - patches/0007-Revert-1433-because-of-build-failures-1450.patch
 
 build:
-  number: 2
+  number: 0
   skip: True  # [win and vc<14]
 
 requirements:
@@ -32,7 +39,7 @@ test:
     - if exist %LIBRARY_PREFIX%\include\fmt\core.h (exit 0) else (exit 1)  # [win]
     - if exist %LIBRARY_PREFIX%\include\fmt\format.h (exit 0) else (exit 1)  # [win]
     - if exist %LIBRARY_PREFIX%\lib\cmake\fmt-config.cmake (exit 0) else (exit 1)  # [win]
-    - if exist %LIBRARY_PREFIX%\lib\lib\fmt.dll  # [win]
+    - if exist %LIBRARY_PREFIX%\bin\fmt.dll (exit 0) else (exit 1)  # [win]
 
 about:
   home: https://fmt.dev/latest/
