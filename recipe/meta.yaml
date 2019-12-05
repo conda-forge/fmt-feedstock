@@ -1,6 +1,6 @@
 {% set name = "fmt" %}
-{% set version = "6.1.0" %}
-{% set sha256 = "8fb84291a7ed6b4db4769115b57fa56d5467b1ab8c3ba5bdf78c820e4bd17944" %}
+{% set version = "6.1.1" %}
+{% set sha256 = "bf4e50955943c1773cc57821d6c00f7e2b9e10eb435fafdd66739d36056d504e" %}
 
 package:
   name: {{ name|lower }}
@@ -9,14 +9,6 @@ package:
 source:
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
   sha256: {{ sha256 }}
-  patches:
-    - patches/0001-Add-a-missing-decimal-point-in-exponent-notation-wit.patch
-    - patches/0002-Fix-compilation-with-MinGW.patch
-    - patches/0003-Update-ChangeLog.rst.patch
-    - patches/0004-Export-assert_fail-with-FMT_API.-This-fixes-dll-buil.patch
-    - patches/0005-Remove-unneeded-FMT_API.patch
-    - patches/0006-Remove-TYPES.patch
-    - patches/0007-Revert-1433-because-of-build-failures-1450.patch
 
 build:
   number: 0
