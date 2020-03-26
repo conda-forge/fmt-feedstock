@@ -11,8 +11,10 @@ source:
   sha256: {{ sha256 }}
 
 build:
-  number: 0
+  number: 1
   skip: True  # [win and vc<14]
+  run_exports:
+    - {{ pin_subpackage('fmt', max_pin='x.x') }}
 
 requirements:
   build:
@@ -49,3 +51,4 @@ extra:
   recipe-maintainers:
     - tdegeus
     - vitaut
+    - saraedum
