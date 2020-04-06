@@ -1,6 +1,6 @@
 {% set name = "fmt" %}
-{% set version = "6.1.2" %}
-{% set sha256 = "1cafc80701b746085dddf41bd9193e6d35089e1c6ec1940e037fcb9c98f62365" %}
+{% set version = "6.2.0" %}
+{% set sha256 = "fe6e4ff397e01c379fc4532519339c93da47404b9f6674184a458a9967a76575" %}
 
 package:
   name: {{ name|lower }}
@@ -12,7 +12,7 @@ source:
 
 build:
   number: 0
-  skip: True  # [win and vc<14]
+  skip: true  # [win and vc<14]
 
 requirements:
   build:
