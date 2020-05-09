@@ -1,6 +1,6 @@
 {% set name = "fmt" %}
-{% set version = "6.2.0" %}
-{% set sha256 = "fe6e4ff397e01c379fc4532519339c93da47404b9f6674184a458a9967a76575" %}
+{% set version = "6.2.1" %}
+{% set sha256 = "5edf8b0f32135ad5fafb3064de26d063571e95e8ae46829c2f4f4b52696bbff0" %}
 
 package:
   name: {{ name|lower }}
@@ -11,7 +11,7 @@ source:
   sha256: {{ sha256 }}
 
 build:
-  number: 1
+  number: 0
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage('fmt', max_pin='x') }}
