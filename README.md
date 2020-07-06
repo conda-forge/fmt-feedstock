@@ -5,7 +5,7 @@ Home: https://fmt.dev/latest/
 
 Package license: MIT
 
-Feedstock license: BSD 3-Clause
+Feedstock license: BSD-3-Clause
 
 Summary: {fmt} is an open-source formatting library for C++
 
