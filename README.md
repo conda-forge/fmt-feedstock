@@ -5,9 +5,13 @@ Home: https://fmt.dev/latest/
 
 Package license: MIT
 
-Feedstock license: BSD-3-Clause
+Feedstock license: [BSD-3-Clause](https://github.com/conda-forge/fmt-feedstock/blob/master/LICENSE.txt)
 
 Summary: {fmt} is an open-source formatting library for C++
+
+Development: https://github.com/fmtlib/fmt
+
+Documentation: https://fmt.dev/latest/
 
 {fmt} is an open-source formatting library for C++.
 It can be used as a safe and fast alternative to (s)printf and iostreams.
