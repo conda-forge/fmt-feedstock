@@ -1,4 +1,4 @@
-From 4081b2fe948aec01a49cc6e231bee4e02df3d61e Mon Sep 17 00:00:00 2001
+From 93ab44afbdbc90888fea6b86b3f77c6b89573f5a Mon Sep 17 00:00:00 2001
 From: Victor Zverovich <victor.zverovich@gmail.com>
 Date: Thu, 29 Oct 2020 08:02:40 -0700
 Subject: [PATCH] Fix ABI compatibility (#1961)
@@ -10,7 +10,7 @@ Subject: [PATCH] Fix ABI compatibility (#1961)
  3 files changed, 44 insertions(+), 6 deletions(-)
 
 diff --git a/include/fmt/format-inl.h b/include/fmt/format-inl.h
-index e3b3490c..5d466eeb 100644
+index b7cb3209..d8d0bb1f 100644
 --- a/include/fmt/format-inl.h
 +++ b/include/fmt/format-inl.h
 @@ -261,11 +261,19 @@ const uint64_t basic_data<T>::powers_of_10_64[] = {
@@ -36,10 +36,10 @@ index e3b3490c..5d466eeb 100644
      10000000000000000000ULL};
  
 diff --git a/include/fmt/format.h b/include/fmt/format.h
-index 5d90f443..da121cbd 100644
+index fbe50450..c3815575 100644
 --- a/include/fmt/format.h
 +++ b/include/fmt/format.h
-@@ -868,8 +868,8 @@ template <typename T> struct FMT_EXTERN_TEMPLATE_API divtest_table_entry {
+@@ -866,8 +866,8 @@ template <typename T> struct FMT_EXTERN_TEMPLATE_API divtest_table_entry {
  // Static data is placed in this class template for the header-only config.
  template <typename T = void> struct FMT_EXTERN_TEMPLATE_API basic_data {
    static const uint64_t powers_of_10_64[];
@@ -50,7 +50,7 @@ index 5d90f443..da121cbd 100644
    static const uint64_t grisu_pow10_significands[];
    static const int16_t grisu_pow10_exponents[];
    static const divtest_table_entry<uint32_t> divtest_table_for_pow5_32[];
-@@ -893,6 +893,10 @@ template <typename T = void> struct FMT_EXTERN_TEMPLATE_API basic_data {
+@@ -891,6 +891,10 @@ template <typename T = void> struct FMT_EXTERN_TEMPLATE_API basic_data {
    static const char signs[];
    static const char left_padding_shifts[5];
    static const char right_padding_shifts[5];
@@ -61,7 +61,7 @@ index 5d90f443..da121cbd 100644
  };
  
  // Maps bsr(n) to ceil(log10(pow(2, bsr(n) + 1) - 1)).
-@@ -919,7 +923,7 @@ struct data : basic_data<> {};
+@@ -917,7 +921,7 @@ struct data : basic_data<> {};
  inline int count_digits(uint64_t n) {
    // https://github.com/fmtlib/format-benchmark/blob/master/digits10
    auto t = bsr2log10(FMT_BUILTIN_CLZLL(n | 1) ^ 63);
@@ -70,7 +70,7 @@ index 5d90f443..da121cbd 100644
  }
  #else
  // Fallback version of count_digits used when __builtin_clz is not available.
-@@ -986,7 +990,7 @@ template <> int count_digits<4>(detail::fallback_uintptr n);
+@@ -984,7 +988,7 @@ template <> int count_digits<4>(detail::fallback_uintptr n);
  // Optional version of count_digits for better performance on 32-bit platforms.
  inline int count_digits(uint32_t n) {
    auto t = bsr2log10(FMT_BUILTIN_CLZ(n | 1) ^ 31);
@@ -79,7 +79,7 @@ index 5d90f443..da121cbd 100644
  }
  #endif
  
-@@ -3787,6 +3791,7 @@ extern template void detail::vformat_to(detail::buffer<char>&, string_view,
+@@ -3786,6 +3790,7 @@ extern template void detail::vformat_to(detail::buffer<char>&, string_view,
                                          basic_format_args<format_context>,
                                          detail::locale_ref);
  namespace detail {
@@ -88,13 +88,13 @@ index 5d90f443..da121cbd 100644
  extern template FMT_API std::string grouping_impl<wchar_t>(locale_ref loc);
  extern template FMT_API char thousands_sep_impl<char>(locale_ref loc);
 diff --git a/src/format.cc b/src/format.cc
-index 88565e60..bca87b03 100644
+index 72713416..7602e643 100644
 --- a/src/format.cc
 +++ b/src/format.cc
-@@ -28,6 +28,31 @@ template dragonbox::decimal_fp<float> dragonbox::to_decimal(float x)
-     FMT_NOEXCEPT;
- template dragonbox::decimal_fp<double> dragonbox::to_decimal(double x)
-     FMT_NOEXCEPT;
+@@ -23,6 +23,31 @@ int format_float(char* buf, std::size_t size, const char* format, int precision,
+   return precision < 0 ? snprintf_ptr(buf, size, format, value)
+                        : snprintf_ptr(buf, size, format, precision, value);
+ }
 +
 +// DEPRECATED! This function exists for ABI compatibility.
 +template <typename Char>
