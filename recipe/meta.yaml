@@ -1,6 +1,6 @@
 {% set name = "fmt" %}
-{% set version = "7.1.0" %}
-{% set sha256 = "a53bce7e3b7ee8c7374723262a43356afff176b1684b86061748409e6f8b56c5" %}
+{% set version = "7.1.1" %}
+{% set sha256 = "b3bc4dc01978b9a001fa1bc07900d6bd2a17e552a39a1c2dad9aad3bfdb868e3" %}
 
 package:
   name: {{ name|lower }}
