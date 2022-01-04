@@ -1,0 +1,30 @@
+From 5a05cb93f34bb1bf8d7084b5adede29251c878d6 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Julian=20R=C3=BCth?= <julian.rueth@fsfe.org>
+Date: Tue, 4 Jan 2022 00:37:58 -0600
+Subject: [PATCH] Restore FMT_API on error_handler::on_error()
+
+this fixes a breaking ABI change that was introduce in the upgrade from
+8.0.1 to 8.1.0.
+
+Fixes #2695.
+---
+ include/fmt/core.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index c946e12a..bdf51a4a 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -601,7 +601,8 @@ struct error_handler {
+   constexpr error_handler(const error_handler&) = default;
+ 
+   // This function is intentionally not constexpr to give a compile-time error.
+-  void on_error(const char* message) { throw_format_error(message); }
++  // This function is marked as FMT_API for backwards compatibility, see #2695.
++  FMT_NORETURN FMT_API void on_error(const char* message) { throw_format_error(message); }
+ };
+ FMT_END_DETAIL_NAMESPACE
+ 
+-- 
+2.34.1
+
