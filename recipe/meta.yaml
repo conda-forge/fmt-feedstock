@@ -32,7 +32,7 @@ test:
     - test -f ${PREFIX}/lib/libfmt.dylib  # [osx]
     - if not exist %LIBRARY_PREFIX%\include\fmt\core.h (exit 1)  # [win]
     - if not exist %LIBRARY_PREFIX%\include\fmt\format.h (exit 1)  # [win]
-    - if not exist %LIBRARY_PREFIX%\lib\cmake\fmt-config.cmake (exit 1)  # [win]
+    - if not exist %LIBRARY_PREFIX%\lib\cmake\fmt\fmt-config.cmake (exit 1)  # [win]
     - if not exist %LIBRARY_PREFIX%\bin\fmt.dll (exit 1)  # [win]
 
 about:
