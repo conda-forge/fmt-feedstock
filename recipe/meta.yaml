@@ -30,10 +30,10 @@ test:
     - test -f ${PREFIX}/lib/cmake/fmt/fmt-config.cmake  # [unix]
     - test -f ${PREFIX}/lib/libfmt.so  # [linux]
     - test -f ${PREFIX}/lib/libfmt.dylib  # [osx]
-    - if exist %LIBRARY_PREFIX%\include\fmt\core.h (exit 0) else (exit 1)  # [win]
-    - if exist %LIBRARY_PREFIX%\include\fmt\format.h (exit 0) else (exit 1)  # [win]
-    - if exist %LIBRARY_PREFIX%\lib\cmake\fmt-config.cmake (exit 0) else (exit 1)  # [win]
-    - if exist %LIBRARY_PREFIX%\bin\fmt.dll (exit 0) else (exit 1)  # [win]
+    - if not exist %LIBRARY_PREFIX%\include\fmt\core.h (exit 1)  # [win]
+    - if not exist %LIBRARY_PREFIX%\include\fmt\format.h (exit 1)  # [win]
+    - if not exist %LIBRARY_PREFIX%\lib\cmake\fmt-config.cmake (exit 1)  # [win]
+    - if not exist %LIBRARY_PREFIX%\bin\fmt.dll (exit 1)  # [win]
 
 about:
   home: https://fmt.dev/latest/
