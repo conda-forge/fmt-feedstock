@@ -1,0 +1,22 @@
+From 28e2d3b640d0705a9622b0393cfc4779277c089c Mon Sep 17 00:00:00 2001
+From: Victor Zverovich <viz@meta.com>
+Date: Sat, 26 Aug 2023 08:29:50 -0700
+Subject: [PATCH] Bump version
+
+---
+ include/fmt/core.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/include/fmt/core.h b/include/fmt/core.h
+index 1fe13888a00..f9e3b7d6dc1 100644
+--- a/include/fmt/core.h
++++ b/include/fmt/core.h
+@@ -18,7 +18,7 @@
+ #include <type_traits>
+ 
+ // The fmt library version in the form major * 10000 + minor * 100 + patch.
+-#define FMT_VERSION 100100
++#define FMT_VERSION 100101
+ 
+ #if defined(__clang__) && !defined(__ibmxl__)
+ #  define FMT_CLANG_VERSION (__clang_major__ * 100 + __clang_minor__)
