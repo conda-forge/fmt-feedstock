@@ -9,9 +9,12 @@ package:
 source:
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
   sha256: {{ sha256 }}
+  patches:
+    # Upstreamed at https://github.com/fmtlib/fmt/pull/3786
+    - 0001-Restore-symbol-from-10.1.patch
 
 build:
-  number: 0
+  number: 1
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage('fmt', max_pin='x') }}
