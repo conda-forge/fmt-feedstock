@@ -39,7 +39,8 @@ test:
     # On a major version jump this is going to replace the "local" fmt with the
     # previous one (and not test anything until libmmamba has been rebuilt with
     # this fmt.)
-    - conda install -y --use-local --no-channel-priority mamba
+    - conda install -y --use-local --no-channel-priority mamba  # [unix]
+    - CALL conda install -y --use-local --no-channel-priority mamba  # [win]
     # Run a command that loads the shared libmamba and libfmt (and check that
     # all symbols can be resolved.)
     - mamba --version
