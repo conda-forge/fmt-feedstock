@@ -14,7 +14,7 @@ source:
     - 0001-Restore-symbol-from-10.1.patch
 
 build:
-  number: 1
+  number: 2
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage('fmt', max_pin='x') }}
@@ -37,6 +37,8 @@ test:
     - if not exist %LIBRARY_PREFIX%\include\fmt\format.h (exit 1)  # [win]
     - if not exist %LIBRARY_PREFIX%\lib\cmake\fmt\fmt-config.cmake (exit 1)  # [win]
     - if not exist %LIBRARY_PREFIX%\bin\fmt.dll (exit 1)  # [win]
+  downstreams:
+    - libmambapy
 
 about:
   home: https://fmt.dev/latest/
