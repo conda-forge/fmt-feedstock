@@ -1,6 +1,6 @@
 {% set name = "fmt" %}
-{% set version = "10.2.0" %}
-{% set sha256 = "3ca91733a7313a8ad41c0885929415f8ec0a2a31d4dc7e27e9331412f4ca26ac" %}
+{% set version = "10.2.1" %}
+{% set sha256 = "1250e4cc58bf06ee631567523f48848dc4596133e163f02615c97f78bab6c811" %}
 
 package:
   name: {{ name|lower }}
@@ -14,7 +14,7 @@ source:
     - 0001-Restore-symbol-from-10.1.patch
 
 build:
-  number: 2
+  number: 0
   skip: true  # [win and vc<14]
   run_exports:
     - {{ pin_subpackage('fmt', max_pin='x') }}
