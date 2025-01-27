@@ -9,4 +9,4 @@ conda_build:
 test: native_and_emulated
 azure:
   # Store build artifacts so we can manually check the symbol tables for ABI breakage
-  store_build_artifacts: False
+  store_build_artifacts: True
