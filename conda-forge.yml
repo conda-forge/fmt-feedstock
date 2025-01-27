@@ -7,3 +7,6 @@ github:
 conda_build:
   pkg_format: '2'
 test: native_and_emulated
+azure:
+  # Store build artifacts so we can manually check the symbol tables for ABI breakage
+  store_build_artifacts: False
