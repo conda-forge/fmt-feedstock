@@ -1,14 +1,12 @@
-{% set name = "fmt" %}
 {% set version = "11.1.4" %}
-{% set sha256 = "ac366b7b4c2e9f0dde63a59b3feb5ee59b67974b14ee5dc9ea8ad78aa2c1ee1e" %}
 
 package:
-  name: {{ name|lower }}
+  name: fmt
   version: {{ version }}
 
 source:
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
-  sha256: {{ sha256 }}
+  sha256: ac366b7b4c2e9f0dde63a59b3feb5ee59b67974b14ee5dc9ea8ad78aa2c1ee1e
 
 build:
   number: 1
