@@ -206,6 +206,7 @@ Feedstock Maintainers
 =====================
 
 * [@bdice](https://github.com/bdice/)
+* [@h-vetinari](https://github.com/h-vetinari/)
 * [@saraedum](https://github.com/saraedum/)
 * [@tdegeus](https://github.com/tdegeus/)
 * [@vitaut](https://github.com/vitaut/)
