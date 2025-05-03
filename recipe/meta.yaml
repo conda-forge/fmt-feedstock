@@ -1,4 +1,4 @@
-{% set version = "11.1.4" %}
+{% set version = "11.2.0" %}
 
 package:
   name: fmt
@@ -6,10 +6,10 @@ package:
 
 source:
   url: https://github.com/fmtlib/fmt/archive/{{ version }}.tar.gz
-  sha256: ac366b7b4c2e9f0dde63a59b3feb5ee59b67974b14ee5dc9ea8ad78aa2c1ee1e
+  sha256: bc23066d87ab3168f27cef3e97d545fa63314f5c79df5ea444d41d56f962c6af
 
 build:
-  number: 1
+  number: 0
   run_exports:
     - {{ pin_subpackage('fmt', max_pin='x.x') }}
 
